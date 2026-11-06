@@ -1,0 +1,122 @@
+package com.javachat.shared.protocol;
+
+/**
+ * Canonical message types for JSON Protocol V1.
+ *
+ * <p>Both clients and the server must use this enum instead of duplicating
+ * string constants. A request and its response share the same requestId.
+ * Server-pushed events do not require a requestId.</p>
+ */
+public enum MessageType {
+    // Connection and protocol lifecycle
+    SYSTEM_HELLO_REQUEST(MessageKind.REQUEST),
+    SYSTEM_HELLO_RESPONSE(MessageKind.RESPONSE),
+    SYSTEM_PING(MessageKind.REQUEST),
+    SYSTEM_PONG(MessageKind.RESPONSE),
+
+    // Authentication and account
+    AUTH_REGISTER_REQUEST(MessageKind.REQUEST),
+    AUTH_REGISTER_RESPONSE(MessageKind.RESPONSE),
+    AUTH_LOGIN_REQUEST(MessageKind.REQUEST),
+    AUTH_LOGIN_RESPONSE(MessageKind.RESPONSE),
+    AUTH_LOGOUT_REQUEST(MessageKind.REQUEST),
+    AUTH_LOGOUT_RESPONSE(MessageKind.RESPONSE),
+    AUTH_SESSION_EXPIRED_EVENT(MessageKind.EVENT),
+    PROFILE_GET_REQUEST(MessageKind.REQUEST),
+    PROFILE_GET_RESPONSE(MessageKind.RESPONSE),
+    PROFILE_UPDATE_REQUEST(MessageKind.REQUEST),
+    PROFILE_UPDATE_RESPONSE(MessageKind.RESPONSE),
+    USER_PRESENCE_CHANGED_EVENT(MessageKind.EVENT),
+
+    // Friends
+    FRIEND_LIST_REQUEST(MessageKind.REQUEST),
+    FRIEND_LIST_RESPONSE(MessageKind.RESPONSE),
+    FRIEND_REQUEST_SEND_REQUEST(MessageKind.REQUEST),
+    FRIEND_REQUEST_SEND_RESPONSE(MessageKind.RESPONSE),
+    FRIEND_REQUEST_RECEIVED_EVENT(MessageKind.EVENT),
+    FRIEND_REQUEST_RESPOND_REQUEST(MessageKind.REQUEST),
+    FRIEND_REQUEST_RESPOND_RESPONSE(MessageKind.RESPONSE),
+    FRIEND_REQUEST_UPDATED_EVENT(MessageKind.EVENT),
+    FRIEND_REMOVE_REQUEST(MessageKind.REQUEST),
+    FRIEND_REMOVE_RESPONSE(MessageKind.RESPONSE),
+    FRIEND_BLOCK_REQUEST(MessageKind.REQUEST),
+    FRIEND_BLOCK_RESPONSE(MessageKind.RESPONSE),
+
+    // Conversations and messages
+    CONVERSATION_LIST_REQUEST(MessageKind.REQUEST),
+    CONVERSATION_LIST_RESPONSE(MessageKind.RESPONSE),
+    CONVERSATION_GET_REQUEST(MessageKind.REQUEST),
+    CONVERSATION_GET_RESPONSE(MessageKind.RESPONSE),
+    DIRECT_CONVERSATION_CREATE_REQUEST(MessageKind.REQUEST),
+    DIRECT_CONVERSATION_CREATE_RESPONSE(MessageKind.RESPONSE),
+    MESSAGE_HISTORY_REQUEST(MessageKind.REQUEST),
+    MESSAGE_HISTORY_RESPONSE(MessageKind.RESPONSE),
+    MESSAGE_SEND_REQUEST(MessageKind.REQUEST),
+    MESSAGE_SEND_RESPONSE(MessageKind.RESPONSE),
+    MESSAGE_CREATED_EVENT(MessageKind.EVENT),
+    MESSAGE_EDIT_REQUEST(MessageKind.REQUEST),
+    MESSAGE_EDIT_RESPONSE(MessageKind.RESPONSE),
+    MESSAGE_UPDATED_EVENT(MessageKind.EVENT),
+    MESSAGE_DELETE_REQUEST(MessageKind.REQUEST),
+    MESSAGE_DELETE_RESPONSE(MessageKind.RESPONSE),
+    MESSAGE_DELETED_EVENT(MessageKind.EVENT),
+    MESSAGE_READ_REQUEST(MessageKind.REQUEST),
+    MESSAGE_READ_RESPONSE(MessageKind.RESPONSE),
+    MESSAGE_READ_EVENT(MessageKind.EVENT),
+    TYPING_STARTED_EVENT(MessageKind.EVENT),
+    TYPING_STOPPED_EVENT(MessageKind.EVENT),
+
+    // Groups
+    GROUP_CREATE_REQUEST(MessageKind.REQUEST),
+    GROUP_CREATE_RESPONSE(MessageKind.RESPONSE),
+    GROUP_UPDATE_REQUEST(MessageKind.REQUEST),
+    GROUP_UPDATE_RESPONSE(MessageKind.RESPONSE),
+    GROUP_UPDATED_EVENT(MessageKind.EVENT),
+    GROUP_DELETE_REQUEST(MessageKind.REQUEST),
+    GROUP_DELETE_RESPONSE(MessageKind.RESPONSE),
+    GROUP_DELETED_EVENT(MessageKind.EVENT),
+    GROUP_MEMBER_LIST_REQUEST(MessageKind.REQUEST),
+    GROUP_MEMBER_LIST_RESPONSE(MessageKind.RESPONSE),
+    GROUP_MEMBER_ADD_REQUEST(MessageKind.REQUEST),
+    GROUP_MEMBER_ADD_RESPONSE(MessageKind.RESPONSE),
+    GROUP_MEMBER_ADDED_EVENT(MessageKind.EVENT),
+    GROUP_MEMBER_REMOVE_REQUEST(MessageKind.REQUEST),
+    GROUP_MEMBER_REMOVE_RESPONSE(MessageKind.RESPONSE),
+    GROUP_MEMBER_REMOVED_EVENT(MessageKind.EVENT),
+    GROUP_MEMBER_ROLE_UPDATE_REQUEST(MessageKind.REQUEST),
+    GROUP_MEMBER_ROLE_UPDATE_RESPONSE(MessageKind.RESPONSE),
+    GROUP_MEMBER_ROLE_UPDATED_EVENT(MessageKind.EVENT),
+
+    // AI assistant
+    AI_CHAT_REQUEST(MessageKind.REQUEST),
+    AI_CHAT_RESPONSE(MessageKind.RESPONSE),
+
+    // Reports and administration
+    REPORT_CREATE_REQUEST(MessageKind.REQUEST),
+    REPORT_CREATE_RESPONSE(MessageKind.RESPONSE),
+    ADMIN_REPORT_LIST_REQUEST(MessageKind.REQUEST),
+    ADMIN_REPORT_LIST_RESPONSE(MessageKind.RESPONSE),
+    ADMIN_REPORT_REVIEW_REQUEST(MessageKind.REQUEST),
+    ADMIN_REPORT_REVIEW_RESPONSE(MessageKind.RESPONSE),
+    ADMIN_USER_STATUS_UPDATE_REQUEST(MessageKind.REQUEST),
+    ADMIN_USER_STATUS_UPDATE_RESPONSE(MessageKind.RESPONSE),
+    ADMIN_GROUP_LIST_REQUEST(MessageKind.REQUEST),
+    ADMIN_GROUP_LIST_RESPONSE(MessageKind.RESPONSE),
+    ADMIN_LOGIN_HISTORY_REQUEST(MessageKind.REQUEST),
+    ADMIN_LOGIN_HISTORY_RESPONSE(MessageKind.RESPONSE),
+    ADMIN_STATS_REQUEST(MessageKind.REQUEST),
+    ADMIN_STATS_RESPONSE(MessageKind.RESPONSE),
+
+    // A failed request is returned with the original requestId.
+    ERROR_RESPONSE(MessageKind.ERROR);
+
+    private final MessageKind kind;
+
+    MessageType(MessageKind kind) {
+        this.kind = kind;
+    }
+
+    public MessageKind getKind() {
+        return kind;
+    }
+}
