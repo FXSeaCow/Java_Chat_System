@@ -38,7 +38,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -57,6 +59,8 @@ public final class ChatPanel extends JPanel {
     private final JPanel footer;
     private final JPanel south = new JPanel(new BorderLayout());
     private final JPanel body = new JPanel(new BorderLayout());
+    private final HistorySearchPanel historySearch = new HistorySearchPanel();
+    private final Map<Long, JPanel> messageRows = new HashMap<>();
     private final JTextArea composer = new JTextArea(2, 20) {
         @Override
         protected void paintComponent(Graphics graphics) {
@@ -75,6 +79,8 @@ public final class ChatPanel extends JPanel {
     private final List<ChatMessage> messages = new ArrayList<>();
     private ConversationSummary conversation;
     private long currentUserId;
+    private long focusedMessageId = -1;
+    private boolean searchOpen;
     private Consumer<MessageSendRequest> sendListener;
 
     public ChatPanel() {
@@ -94,6 +100,8 @@ public final class ChatPanel extends JPanel {
         footer = createComposer();
         south.add(footer, BorderLayout.SOUTH);
         add(south, BorderLayout.SOUTH);
+        historySearch.setSelectMessageListener(this::focusMessage);
+        historySearch.setCloseListener(() -> showSearch(false));
         empty.setForeground(MUTED);
         empty.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
         renderMessages();
@@ -101,6 +109,7 @@ public final class ChatPanel extends JPanel {
 
     public void setCurrentUserId(long userId) {
         currentUserId = userId;
+        historySearch.setCurrentUserId(userId);
         renderMessages();
     }
 
@@ -120,6 +129,10 @@ public final class ChatPanel extends JPanel {
         if (changed) {
             messages.clear();
             composer.setText("");
+            focusedMessageId = -1;
+            historySearch.setConversationTitle(ConversationListPanel.title(item));
+            historySearch.setMessages(List.of());
+            showSearch(false);
         }
         removeAll();
         add(createHeader(item), BorderLayout.NORTH);
@@ -140,6 +153,7 @@ public final class ChatPanel extends JPanel {
         }
         messages.sort(Comparator.comparing(ChatMessage::createdAt,
                 Comparator.nullsLast(Comparator.naturalOrder())).thenComparingLong(ChatMessage::id));
+        historySearch.setMessages(messages);
         renderMessages();
     }
 
@@ -150,6 +164,7 @@ public final class ChatPanel extends JPanel {
         messages.add(message);
         messages.sort(Comparator.comparing(ChatMessage::createdAt,
                 Comparator.nullsLast(Comparator.naturalOrder())).thenComparingLong(ChatMessage::id));
+        historySearch.setMessages(messages);
         renderMessages();
     }
 
@@ -176,7 +191,33 @@ public final class ChatPanel extends JPanel {
         labels.add(Box.createVerticalStrut(3));
         labels.add(type);
         header.add(labels, BorderLayout.CENTER);
+        JButton find = new SearchButton();
+        find.setPreferredSize(new Dimension(38, 38));
+        find.setToolTipText("Tìm trong lịch sử chat");
+        find.addActionListener(event -> showSearch(!searchOpen));
+        header.add(find, BorderLayout.EAST);
         return header;
+    }
+
+    private void showSearch(boolean visible) {
+        searchOpen = visible;
+        body.removeAll();
+        body.add(visible ? historySearch : scroll, BorderLayout.CENTER);
+        south.setVisible(!visible);
+        body.revalidate();
+        body.repaint();
+        if (visible) javax.swing.SwingUtilities.invokeLater(historySearch::focusSearch);
+    }
+
+    private void focusMessage(long messageId) {
+        if (messages.stream().noneMatch(message -> message.id() == messageId)) return;
+        focusedMessageId = messageId;
+        showSearch(false);
+        renderMessages();
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            JPanel row = messageRows.get(messageId);
+            if (row != null) row.scrollRectToVisible(new Rectangle(0, 0, row.getWidth(), row.getHeight()));
+        });
     }
 
     private JPanel createComposer() {
@@ -236,6 +277,7 @@ public final class ChatPanel extends JPanel {
 
     private void renderMessages() {
         messageList.removeAll();
+        messageRows.clear();
         if (messages.isEmpty()) {
             JPanel emptyRow = new JPanel(new java.awt.GridBagLayout());
             emptyRow.setOpaque(false);
@@ -253,6 +295,7 @@ public final class ChatPanel extends JPanel {
                     lastDay = day;
                 }
                 JPanel row = messageRow(message);
+                messageRows.put(message.id(), row);
                 messageList.add(row);
                 messageList.add(Box.createVerticalStrut(10));
             }
@@ -288,7 +331,7 @@ public final class ChatPanel extends JPanel {
             row.add(label);
             return row;
         }
-        JPanel bubble = new Bubble(own ? BLUE : Color.WHITE, 18);
+        JPanel bubble = new Bubble(own ? BLUE : Color.WHITE, 18, message.id() == focusedMessageId);
         bubble.setLayout(new BoxLayout(bubble, BoxLayout.Y_AXIS));
         bubble.setBorder(BorderFactory.createEmptyBorder(10, 14, 8, 14));
         String body = content(message);
@@ -337,10 +380,16 @@ public final class ChatPanel extends JPanel {
     private static final class Bubble extends JPanel {
         private final Color color;
         private final int radius;
+        private final boolean highlighted;
 
         Bubble(Color color, int radius) {
+            this(color, radius, false);
+        }
+
+        Bubble(Color color, int radius, boolean highlighted) {
             this.color = color;
             this.radius = radius;
+            this.highlighted = highlighted;
             setOpaque(false);
         }
 
@@ -350,6 +399,11 @@ public final class ChatPanel extends JPanel {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setColor(color);
             g.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+            if (highlighted) {
+                g.setColor(new Color(242, 174, 39));
+                g.setStroke(new BasicStroke(2));
+                g.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, radius, radius);
+            }
             g.dispose();
             super.paintComponent(graphics);
         }
@@ -387,6 +441,28 @@ public final class ChatPanel extends JPanel {
             g.drawLine(15, mid, 30, mid);
             g.drawLine(24, mid - 6, 30, mid);
             g.drawLine(24, mid + 6, 30, mid);
+            g.dispose();
+        }
+    }
+
+    private static final class SearchButton extends JButton {
+        SearchButton() {
+            setBorder(null);
+            setContentAreaFilled(false);
+            setFocusPainted(false);
+            setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        }
+
+        @Override
+        protected void paintComponent(Graphics graphics) {
+            Graphics2D g = (Graphics2D) graphics.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(new Color(245, 248, 252));
+            g.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
+            g.setColor(MUTED);
+            g.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g.drawOval(11, 10, 12, 12);
+            g.drawLine(22, 21, 28, 28);
             g.dispose();
         }
     }

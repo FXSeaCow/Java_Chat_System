@@ -63,3 +63,29 @@ Khi chọn một hội thoại: hiện tiêu đề, danh sách tin nhắn và ô
 - `MainFrame`: thêm `setCurrentUserId`, `setMessages`, `appendMessage`,
   `setSendMessageListener`.
 - `UserClientApp`: demo có lịch sử tin nhắn mẫu, gửi tin thì hiện ngay.
+
+## JC-27 – Màn hình tìm kiếm trong lịch sử chat
+
+### Yêu cầu
+
+Tìm chuỗi trong lịch sử chat của hội thoại đang mở. Bấm vào kết quả thì nhảy tới
+tin nhắn đó.
+
+### Kế hoạch của AI
+
+1. Tạo `HistorySearchPanel`, mở bằng nút kính lúp trên header khung chat.
+2. Ở bản giao diện, chỉ tìm trong các tin đã tải trên client. Tìm trên server
+   (JC-86) và trên mọi hội thoại (JC-87) thuộc Sprint 3.
+3. Tìm không phân biệt hoa thường và không phân biệt dấu tiếng Việt.
+4. Bấm vào kết quả thì cuộn tới tin nhắn và tô viền tin đó.
+
+### AI đã làm gì
+
+- `HistorySearchPanel`
+  - Ô tìm kiếm, dòng phạm vi và số kết quả.
+  - Bỏ dấu bằng `java.text.Normalizer` trước khi so khớp.
+  - Bỏ qua tin đã xoá và tin hệ thống.
+  - Mỗi kết quả có người gửi, đoạn trích và thời gian.
+- `ChatPanel`
+  - Nút kính lúp bật/tắt màn hình tìm kiếm.
+  - `focusMessage(id)` cuộn tới tin nhắn và tô viền vàng.
