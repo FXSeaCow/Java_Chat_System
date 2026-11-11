@@ -89,3 +89,43 @@ tin nhắn đó.
 - `ChatPanel`
   - Nút kính lúp bật/tắt màn hình tìm kiếm.
   - `focusMessage(id)` cuộn tới tin nhắn và tô viền vàng.
+
+## JC-28 – Panel gợi ý chat bằng LLM
+
+### Yêu cầu
+
+Panel trong khung chat để xin AI gợi ý câu trả lời từ các tin nhắn gần đây.
+Người dùng xem lại gợi ý rồi mới chèn vào ô nhập.
+
+### Kế hoạch của AI
+
+1. Ticket này chỉ làm giao diện. Gọi LLM thật thuộc JC-117 (Sprint 4).
+2. Dùng DTO có sẵn: gửi `AiDtos.ChatRequest` (`AI_CHAT_REQUEST`), nhận
+   `AiDtos.ChatResponse` (`AI_CHAT_RESPONSE`).
+3. Không tự gửi tin do AI viết. Người dùng phải chèn vào ô nhập rồi tự bấm Gửi.
+4. Có đủ trạng thái: chưa kết nối, đang tải, có kết quả, lỗi. Bỏ qua kết quả của
+   hội thoại cũ nếu người dùng đã chuyển hội thoại.
+
+### AI đã làm gì
+
+- `LlmSuggestionPanel`: các nút "Tạo gợi ý", "Chèn vào ô nhập", "Đóng". Có các
+  trạng thái `reset`, `setLoading`, `setSuggestion` (ghi nguồn model), `setError`.
+- `ChatPanel`
+  - Nút "✦ Gợi ý AI" cạnh nút Gửi.
+  - `requestAiSuggestion()` lấy tối đa 6 tin văn bản gần nhất và tạo prompt
+    tiếng Việt.
+  - Kết quả chỉ được nhận nếu đúng `conversationId`.
+- `MainFrame`: thêm `setAiSuggestionListener`, `setAiSuggestionResult`,
+  `setAiSuggestionError`.
+- `UserClientApp`: ở chế độ demo, listener trả về một câu trả lời mẫu.
+
+## Phiên làm việc với AI ngày 11/11/2026
+
+Công cụ: Claude Code (Claude Opus 5.5) trong VS Code.
+
+- Hướng dẫn chạy project (máy chưa có Maven, chạy bằng `javac` hoặc VS Code).
+- Kiểm tra JC-28: giao diện đã xong, chế độ demo trả câu mẫu, server chưa có.
+- Giải thích luồng gợi ý LLM khi chạy thật: client → server → LLM API → client.
+- Đối chiếu JC-24 đến JC-28 trên Jira với code. Phát hiện code chưa được commit.
+- Tách code thành từng commit theo subtask: lùi ngược từ bản cuối để tạo các phiên
+  bản JC-25, JC-26, JC-27. Biên dịch thử từng bản bằng `javac` rồi commit lần lượt.

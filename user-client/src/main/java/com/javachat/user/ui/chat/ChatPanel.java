@@ -2,6 +2,7 @@ package com.javachat.user.ui.chat;
 
 import com.javachat.shared.dto.ChatDtos.ConversationSummary;
 import com.javachat.shared.dto.ChatDtos.MessageSendRequest;
+import com.javachat.shared.dto.AiDtos;
 import com.javachat.shared.model.ChatMessage;
 import com.javachat.shared.model.ChatMessageStatus;
 import com.javachat.shared.model.ChatMessageType;
@@ -58,6 +59,7 @@ public final class ChatPanel extends JPanel {
     private final JScrollPane scroll;
     private final JPanel footer;
     private final JPanel south = new JPanel(new BorderLayout());
+    private final LlmSuggestionPanel aiPanel = new LlmSuggestionPanel();
     private final JPanel body = new JPanel(new BorderLayout());
     private final HistorySearchPanel historySearch = new HistorySearchPanel();
     private final Map<Long, JPanel> messageRows = new HashMap<>();
@@ -82,6 +84,8 @@ public final class ChatPanel extends JPanel {
     private long focusedMessageId = -1;
     private boolean searchOpen;
     private Consumer<MessageSendRequest> sendListener;
+    private Consumer<AiDtos.ChatRequest> aiSuggestionListener;
+    private boolean aiLoading;
 
     public ChatPanel() {
         super(new BorderLayout());
@@ -98,7 +102,12 @@ public final class ChatPanel extends JPanel {
         body.add(scroll, BorderLayout.CENTER);
         add(body, BorderLayout.CENTER);
         footer = createComposer();
+        south.add(aiPanel, BorderLayout.NORTH);
         south.add(footer, BorderLayout.SOUTH);
+        aiPanel.setVisible(false);
+        aiPanel.setGenerateAction(this::requestAiSuggestion);
+        aiPanel.setInsertAction(this::insertAiSuggestion);
+        aiPanel.setCloseAction(() -> aiPanel.setVisible(false));
         add(south, BorderLayout.SOUTH);
         historySearch.setSelectMessageListener(this::focusMessage);
         historySearch.setCloseListener(() -> showSearch(false));
@@ -118,6 +127,27 @@ public final class ChatPanel extends JPanel {
         updateSendState();
     }
 
+    public void setAiSuggestionListener(Consumer<AiDtos.ChatRequest> listener) {
+        aiSuggestionListener = listener;
+        if (!aiLoading) aiPanel.reset(listener != null);
+    }
+
+    public void setAiSuggestionResult(long conversationId, AiDtos.ChatResponse response) {
+        if (conversationId != conversationId() || !aiLoading) return;
+        aiLoading = false;
+        if (response == null || response.response() == null || response.response().isBlank()) {
+            aiPanel.setError("AI không trả về gợi ý. Hãy thử lại.");
+        } else {
+            aiPanel.setSuggestion(response.response(), response.model());
+        }
+    }
+
+    public void setAiSuggestionError(long conversationId, String message) {
+        if (conversationId != conversationId() || !aiLoading) return;
+        aiLoading = false;
+        aiPanel.setError(message);
+    }
+
     public long conversationId() {
         return conversation == null ? -1 : conversation.conversation().id();
     }
@@ -133,6 +163,9 @@ public final class ChatPanel extends JPanel {
             historySearch.setConversationTitle(ConversationListPanel.title(item));
             historySearch.setMessages(List.of());
             showSearch(false);
+            aiLoading = false;
+            aiPanel.reset(aiSuggestionListener != null);
+            aiPanel.setVisible(false);
         }
         removeAll();
         add(createHeader(item), BorderLayout.NORTH);
@@ -254,6 +287,13 @@ public final class ChatPanel extends JPanel {
         sendButton.addActionListener(event -> sendMessage());
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         buttons.setOpaque(false);
+        JButton aiButton = new JButton("✦ Gợi ý AI");
+        aiButton.setToolTipText("Tạo câu trả lời gợi ý từ các tin nhắn gần đây");
+        aiButton.addActionListener(event -> {
+            aiPanel.setVisible(!aiPanel.isVisible());
+            south.revalidate();
+        });
+        buttons.add(aiButton);
         buttons.add(sendButton);
         footer.add(buttons, BorderLayout.EAST);
         updateSendState();
@@ -262,6 +302,46 @@ public final class ChatPanel extends JPanel {
 
     private void updateSendState() {
         sendButton.setEnabled(conversation != null && sendListener != null && !composer.getText().isBlank());
+    }
+
+    private void requestAiSuggestion() {
+        if (conversation == null || aiLoading) return;
+        if (aiSuggestionListener == null) {
+            aiPanel.reset(false);
+            return;
+        }
+        List<ChatMessage> context = messages.stream()
+                .filter(message -> message.messageType() == ChatMessageType.TEXT
+                        && message.status() != ChatMessageStatus.DELETED
+                        && message.content() != null && !message.content().isBlank())
+                .toList();
+        if (context.isEmpty()) {
+            aiPanel.setError("Chưa có tin nhắn để tạo gợi ý.");
+            return;
+        }
+        StringBuilder prompt = new StringBuilder("Dựa trên hội thoại sau, gợi ý một câu trả lời ngắn gọn, tự nhiên bằng tiếng Việt. "
+                + "Chỉ trả về nội dung tin nhắn, không giải thích.\n");
+        for (ChatMessage message : context.subList(Math.max(0, context.size() - 6), context.size())) {
+            prompt.append(message.senderId() != null && message.senderId() == currentUserId ? "Bạn: " : "Người kia: ")
+                    .append(message.content().strip()).append('\n');
+        }
+        aiLoading = true;
+        aiPanel.setLoading();
+        try {
+            aiSuggestionListener.accept(new AiDtos.ChatRequest(conversationId(), prompt.toString()));
+        } catch (RuntimeException exception) {
+            aiLoading = false;
+            aiPanel.setError("Không thể gửi yêu cầu gợi ý. Hãy thử lại.");
+        }
+    }
+
+    private void insertAiSuggestion() {
+        String text = aiPanel.suggestion().strip();
+        if (text.isEmpty()) return;
+        String draft = composer.getText();
+        composer.setText(draft.isBlank() ? text : draft.stripTrailing() + "\n" + text);
+        composer.requestFocusInWindow();
+        aiPanel.setVisible(false);
     }
 
     private void sendMessage() {

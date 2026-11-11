@@ -1,6 +1,7 @@
 package com.javachat.user;
 
 import com.javachat.shared.dto.ChatDtos.ConversationSummary;
+import com.javachat.shared.dto.AiDtos;
 import com.javachat.shared.model.ChatMessage;
 import com.javachat.shared.model.ChatMessageStatus;
 import com.javachat.shared.model.ChatMessageType;
@@ -43,6 +44,9 @@ public final class UserClientApp {
             history.computeIfAbsent(request.conversationId(), ignored -> new ArrayList<>()).add(message);
             frame.appendMessage(message);
         });
+        frame.setAiSuggestionListener(request -> frame.setAiSuggestionResult(request.conversationId(),
+                new AiDtos.ChatResponse(1L, "Mình đã xem tin nhắn của bạn. Mình sẽ phản hồi chi tiết ngay nhé!",
+                        "Demo (câu trả lời mẫu)", 0, 0)));
     }
 
     private static List<ConversationSummary> demoConversations(Instant now) {

@@ -2,6 +2,7 @@ package com.javachat.user.ui.chat;
 
 import com.javachat.shared.dto.ChatDtos.ConversationSummary;
 import com.javachat.shared.dto.ChatDtos.MessageSendRequest;
+import com.javachat.shared.dto.AiDtos;
 import com.javachat.shared.model.ChatMessage;
 
 import javax.swing.Box;
@@ -74,6 +75,19 @@ public final class MainFrame extends JFrame {
 
     public void setSendMessageListener(Consumer<MessageSendRequest> listener) {
         chat.setSendListener(listener);
+    }
+
+    /** Supply the AI request handler; send the result back on the Swing event dispatch thread. */
+    public void setAiSuggestionListener(Consumer<AiDtos.ChatRequest> listener) {
+        chat.setAiSuggestionListener(listener);
+    }
+
+    public void setAiSuggestionResult(long conversationId, AiDtos.ChatResponse response) {
+        chat.setAiSuggestionResult(conversationId, response);
+    }
+
+    public void setAiSuggestionError(long conversationId, String message) {
+        chat.setAiSuggestionError(conversationId, message);
     }
 
     private void selectConversation(ConversationSummary item) {
