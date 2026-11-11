@@ -1,7 +1,7 @@
 # JSON Protocol V1 - Message Types
 
 Tài liệu này là nguồn chuẩn cho tên message trao đổi giữa Java client và server.
-Code phía client và server phải dùng `MessageType` trong module `shared`, không tự
+Code phía client và server phải dùng `MessageType` trong module `common`, không tự
 khai báo chuỗi message riêng.
 
 ## 1. Envelope chung
