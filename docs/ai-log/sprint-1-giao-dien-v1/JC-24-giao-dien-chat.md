@@ -37,3 +37,29 @@ bên phải. Danh sách tìm kiếm được và lọc được hội thoại ch
   `setConversations(...)` và `setOpenConversationListener(...)`.
 - `UserClientApp`: hàm `main`. Tham số `--demo` nạp 3 hội thoại mẫu.
 - README: hướng dẫn chạy demo.
+
+## JC-26 – Khung chat
+
+### Yêu cầu
+
+Khi chọn một hội thoại: hiện tiêu đề, danh sách tin nhắn và ô nhập để gửi tin.
+
+### Kế hoạch của AI
+
+1. Tạo `ChatPanel` riêng và gắn vào vùng chi tiết của `MainFrame`.
+2. Dùng đúng kiểu dữ liệu của `common`: nhận `ChatMessage`, gửi `MessageSendRequest`.
+3. Nút Gửi chỉ gọi listener do bên ngoài cung cấp, UI không tự gửi qua mạng.
+4. Không thêm trùng tin nhắn khi server gửi lại cùng một ID.
+
+### AI đã làm gì
+
+- `ChatPanel`
+  - Header có avatar, tên và loại hội thoại.
+  - Bong bóng tin nhắn: tin của mình bên phải, của người khác bên trái, tin hệ
+    thống ở giữa. Có giờ gửi và nhãn phân cách ngày.
+  - Tin đã xoá hiện "Tin nhắn đã bị xóa".
+  - Ô nhập: Enter để gửi, Shift+Enter để xuống dòng. Nút Gửi bị khoá khi ô trống.
+  - Tự cuộn xuống tin mới nhất.
+- `MainFrame`: thêm `setCurrentUserId`, `setMessages`, `appendMessage`,
+  `setSendMessageListener`.
+- `UserClientApp`: demo có lịch sử tin nhắn mẫu, gửi tin thì hiện ngay.

@@ -1,6 +1,8 @@
 package com.javachat.user.ui.chat;
 
 import com.javachat.shared.dto.ChatDtos.ConversationSummary;
+import com.javachat.shared.dto.ChatDtos.MessageSendRequest;
+import com.javachat.shared.model.ChatMessage;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -20,7 +22,7 @@ import java.awt.geom.RoundRectangle2D;
 import java.util.List;
 import java.util.function.Consumer;
 
-/** Main chat shell. The detail area is reserved for the message screen (JC-26). */
+/** Main chat shell: conversation list on the left, chat panel on the right. */
 public final class MainFrame extends JFrame {
     private static final Color INK = new Color(30, 48, 72);
     private static final Color MUTED = new Color(113, 132, 157);
@@ -29,6 +31,7 @@ public final class MainFrame extends JFrame {
 
     private final ConversationListPanel conversations = new ConversationListPanel();
     private final JPanel detail = new JPanel(new BorderLayout());
+    private final ChatPanel chat = new ChatPanel();
     private Consumer<ConversationSummary> openConversation = ignored -> { };
 
     public MainFrame() {
@@ -55,14 +58,32 @@ public final class MainFrame extends JFrame {
         openConversation = listener == null ? ignored -> { } : listener;
     }
 
+    public void setCurrentUserId(long userId) {
+        chat.setCurrentUserId(userId);
+    }
+
+    /** Called after MESSAGE_HISTORY_RESPONSE for the selected conversation. */
+    public void setMessages(long conversationId, List<ChatMessage> messages) {
+        if (chat.conversationId() == conversationId) chat.setMessages(messages);
+    }
+
+    /** Called after MESSAGE_CREATED_EVENT or a successful send response. */
+    public void appendMessage(ChatMessage message) {
+        chat.appendMessage(message);
+    }
+
+    public void setSendMessageListener(Consumer<MessageSendRequest> listener) {
+        chat.setSendListener(listener);
+    }
+
     private void selectConversation(ConversationSummary item) {
         if (item == null) {
             showWelcome();
             return;
         }
         detail.removeAll();
-        detail.add(emptyDetail(ConversationListPanel.title(item),
-                "Nội dung hội thoại sẽ hiển thị tại đây."), BorderLayout.CENTER);
+        chat.setConversation(item);
+        detail.add(chat, BorderLayout.CENTER);
         detail.revalidate();
         detail.repaint();
         openConversation.accept(item);

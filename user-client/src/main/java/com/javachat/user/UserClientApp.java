@@ -11,7 +11,11 @@ import com.javachat.user.ui.chat.MainFrame;
 import javax.swing.SwingUtilities;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class UserClientApp {
     private UserClientApp() { }
@@ -26,7 +30,19 @@ public final class UserClientApp {
 
     private static void setupDemo(MainFrame frame) {
         Instant now = Instant.now();
+        Map<Long, List<ChatMessage>> history = demoHistory(now);
+        AtomicLong nextId = new AtomicLong(1000);
+        frame.setCurrentUserId(1L);
         frame.setConversations(demoConversations(now));
+        frame.setOpenConversationListener(item -> frame.setMessages(item.conversation().id(),
+                history.getOrDefault(item.conversation().id(), List.of())));
+        frame.setSendMessageListener(request -> {
+            ChatMessage message = new ChatMessage(nextId.incrementAndGet(), request.conversationId(), 1L,
+                    request.replyToId(), request.content(), ChatMessageType.TEXT, ChatMessageStatus.SENT,
+                    Instant.now(), null, List.of());
+            history.computeIfAbsent(request.conversationId(), ignored -> new ArrayList<>()).add(message);
+            frame.appendMessage(message);
+        });
     }
 
     private static List<ConversationSummary> demoConversations(Instant now) {
@@ -37,6 +53,27 @@ public final class UserClientApp {
                         now.minus(2, ChronoUnit.HOURS)),
                 sample(3, ConversationType.DIRECT, "Trần Gia Huy", "Cảm ơn bạn nhiều", 1,
                         now.minus(1, ChronoUnit.DAYS)));
+    }
+
+    private static Map<Long, List<ChatMessage>> demoHistory(Instant now) {
+        Map<Long, List<ChatMessage>> result = new HashMap<>();
+        result.put(1L, new ArrayList<>(List.of(
+                demoMessage(101, 1, 2, "Chào bạn! Phần giao diện chat đã sẵn sàng chưa?",
+                        now.minus(34, ChronoUnit.MINUTES)),
+                demoMessage(102, 1, 1, "Mình đang hoàn thiện khung chat và danh sách hội thoại.",
+                        now.minus(28, ChronoUnit.MINUTES)),
+                demoMessage(103, 1, 2, "Mai mình họp lúc 9 giờ nhé!",
+                        now.minus(7, ChronoUnit.MINUTES)))));
+        result.put(2L, new ArrayList<>(List.of(
+                demoMessage(201, 2, 3, "Mọi người xem giúp bản thiết kế mới nhé.",
+                        now.minus(5, ChronoUnit.HOURS)),
+                demoMessage(202, 2, 1, "Mình đã cập nhật giao diện.",
+                        now.minus(2, ChronoUnit.HOURS)))));
+        result.put(3L, new ArrayList<>(List.of(
+                demoMessage(301, 3, 1, "Mình đã gửi tài liệu cho bạn rồi.",
+                        now.minus(1, ChronoUnit.DAYS).minus(12, ChronoUnit.MINUTES)),
+                demoMessage(302, 3, 2, "Cảm ơn bạn nhiều", now.minus(1, ChronoUnit.DAYS)))));
+        return result;
     }
 
     private static ConversationSummary sample(long id, ConversationType type, String title,
