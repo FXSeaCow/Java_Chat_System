@@ -1,0 +1,16 @@
+# Copy this file to config.properties and set values for your local environment.
+# These keys are a starting convention; the application does not load them yet.
+
+# TCP server and client connection
+server.host=127.0.0.1
+server.port=8080
+
+# MySQL 8.0.16+; create the database before running database/schema.sql.
+database.url=jdbc:mysql://localhost:3306/java_chat
+database.username=java_chat
+database.password=
+
+# Optional AI integration; leave blank until a provider is configured.
+ai.api_url=
+ai.api_key=
+ai.model=
