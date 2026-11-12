@@ -19,6 +19,7 @@ import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -63,6 +64,18 @@ public final class LoginFrame extends JFrame {
     private final JPasswordField passwordField = new RoundedPasswordField();
     private final JLabel loginError = errorLabel();
     private final JLabel passwordError = errorLabel();
+    private final JTextField fullNameField = new RoundedTextField("Nguyễn Minh Anh");
+    private final JTextField registrationEmailField = new RoundedTextField("you@example.com");
+    private final JPasswordField registrationPasswordField = new RoundedPasswordField();
+    private final JPasswordField confirmPasswordField = new RoundedPasswordField();
+    private final JLabel fullNameError = errorLabel();
+    private final JLabel registrationEmailError = errorLabel();
+    private final JLabel registrationPasswordError = errorLabel();
+    private final JLabel confirmPasswordError = errorLabel();
+    private final JLabel termsError = errorLabel();
+    private final JCheckBox termsCheckBox = new JCheckBox("Tôi đồng ý với Điều khoản sử dụng");
+    private final CardLayout authCardLayout = new CardLayout();
+    private final JPanel authCards = new JPanel(authCardLayout);
     private final JLabel formStatus = new JLabel(" ");
     private final RoundedButton submitButton = new RoundedButton("Đăng nhập", true);
     private final PawModeSwitch modeSwitch = new PawModeSwitch();
@@ -126,56 +139,19 @@ public final class LoginFrame extends JFrame {
         modeSwitch.setAlignmentX(LEFT_ALIGNMENT);
         modeSwitch.setSelectionListener(this::setMode);
 
-        RoundedButton google = new RoundedButton("Tiếp tục với Google", false);
-        google.setIcon(new GoogleIcon());
-        google.setIconTextGap(14);
-        google.setAlignmentX(LEFT_ALIGNMENT);
-        google.setMaximumSize(new Dimension(Integer.MAX_VALUE, 54));
-        google.getAccessibleContext().setAccessibleDescription("Đăng nhập bằng tài khoản Google");
-        google.addActionListener(event -> setStatus("Google Sign-In sẽ được kết nối với máy chủ sau.", false));
-
         form.add(heading);
         form.add(Box.createVerticalStrut(7));
         form.add(subheading);
         form.add(Box.createVerticalStrut(20));
         form.add(modeSwitch);
-        form.add(Box.createVerticalStrut(16));
-        form.add(google);
-        form.add(Box.createVerticalStrut(17));
-        form.add(divider());
-        form.add(Box.createVerticalStrut(16));
-        form.add(fieldLabel("Email hoặc tên đăng nhập"));
-        form.add(Box.createVerticalStrut(8));
-        configureField(loginField, "Email hoặc tên đăng nhập");
-        form.add(loginField);
-        form.add(loginError);
-        form.add(Box.createVerticalStrut(7));
-
-        JPanel passwordRow = new JPanel(new BorderLayout());
-        passwordRow.setOpaque(false);
-        passwordRow.setAlignmentX(LEFT_ALIGNMENT);
-        passwordRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 24));
-        passwordRow.add(fieldLabel("Mật khẩu"), BorderLayout.WEST);
-        JButton forgot = linkButton("Quên mật khẩu?");
-        forgot.addActionListener(event -> setStatus("Liên kết đặt lại mật khẩu sẽ được gửi qua email.", false));
-        passwordRow.add(forgot, BorderLayout.EAST);
-        form.add(passwordRow);
-        form.add(Box.createVerticalStrut(8));
-        configureField(passwordField, "Mật khẩu");
-        form.add(passwordField);
-        form.add(passwordError);
-
-        JCheckBox showPassword = new JCheckBox("Hiện mật khẩu");
-        showPassword.setOpaque(false);
-        showPassword.setForeground(MUTED);
-        showPassword.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
-        showPassword.setFocusPainted(true);
-        showPassword.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        showPassword.setAlignmentX(LEFT_ALIGNMENT);
-        char echo = passwordField.getEchoChar();
-        showPassword.addActionListener(event -> passwordField.setEchoChar(showPassword.isSelected() ? (char) 0 : echo));
-        form.add(Box.createVerticalStrut(4));
-        form.add(showPassword);
+        form.add(Box.createVerticalStrut(12));
+        authCards.setOpaque(false);
+        authCards.setAlignmentX(LEFT_ALIGNMENT);
+        authCards.setMaximumSize(new Dimension(Integer.MAX_VALUE, 330));
+        authCards.setPreferredSize(new Dimension(420, 330));
+        authCards.add(buildLoginCard(), "login");
+        authCards.add(buildRegistrationCard(), "register");
+        form.add(authCards);
         form.add(Box.createVerticalStrut(11));
 
         submitButton.setAlignmentX(LEFT_ALIGNMENT);
@@ -190,6 +166,110 @@ public final class LoginFrame extends JFrame {
         return form;
     }
 
+    private JPanel buildLoginCard() {
+        JPanel card = verticalCard();
+        RoundedButton google = new RoundedButton("Tiếp tục với Google", false);
+        google.setIcon(new GoogleIcon());
+        google.setIconTextGap(14);
+        google.setAlignmentX(LEFT_ALIGNMENT);
+        google.setMaximumSize(new Dimension(Integer.MAX_VALUE, 50));
+        google.getAccessibleContext().setAccessibleDescription("Đăng nhập bằng tài khoản Google");
+        google.addActionListener(event -> setStatus("Google Sign-In sẽ được kết nối với máy chủ sau.", false));
+        card.add(google);
+        card.add(Box.createVerticalStrut(10));
+        card.add(divider());
+        card.add(Box.createVerticalStrut(10));
+        card.add(fieldLabel("Email hoặc tên đăng nhập"));
+        card.add(Box.createVerticalStrut(5));
+        configureField(loginField, "Email hoặc tên đăng nhập");
+        card.add(loginField);
+        card.add(loginError);
+
+        JPanel passwordRow = new JPanel(new BorderLayout());
+        passwordRow.setOpaque(false);
+        passwordRow.setAlignmentX(LEFT_ALIGNMENT);
+        passwordRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+        passwordRow.add(fieldLabel("Mật khẩu"), BorderLayout.WEST);
+        JButton forgot = linkButton("Quên mật khẩu?");
+        forgot.addActionListener(event -> setStatus("Liên kết đặt lại mật khẩu sẽ được gửi qua email.", false));
+        passwordRow.add(forgot, BorderLayout.EAST);
+        card.add(passwordRow);
+        card.add(Box.createVerticalStrut(5));
+        configureField(passwordField, "Mật khẩu");
+        card.add(passwordField);
+        card.add(passwordError);
+
+        JCheckBox showPassword = compactCheckBox("Hiện mật khẩu");
+        char echo = passwordField.getEchoChar();
+        showPassword.addActionListener(event -> passwordField.setEchoChar(
+                showPassword.isSelected() ? (char) 0 : echo));
+        card.add(showPassword);
+        return card;
+    }
+
+    private JPanel buildRegistrationCard() {
+        JPanel card = verticalCard();
+        card.add(fieldLabel("Họ và tên"));
+        card.add(Box.createVerticalStrut(5));
+        configureCompactField(fullNameField, "Họ và tên");
+        card.add(fullNameField);
+        card.add(fullNameError);
+
+        card.add(fieldLabel("Email"));
+        card.add(Box.createVerticalStrut(5));
+        configureCompactField(registrationEmailField, "Email đăng ký");
+        card.add(registrationEmailField);
+        card.add(registrationEmailError);
+
+        JPanel labels = new JPanel(new GridLayout(1, 2, 10, 0));
+        labels.setOpaque(false);
+        labels.setAlignmentX(LEFT_ALIGNMENT);
+        labels.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+        labels.add(fieldLabel("Mật khẩu"));
+        labels.add(fieldLabel("Xác nhận mật khẩu"));
+        card.add(labels);
+        card.add(Box.createVerticalStrut(5));
+
+        JPanel passwordFields = new JPanel(new GridLayout(1, 2, 10, 0));
+        passwordFields.setOpaque(false);
+        passwordFields.setAlignmentX(LEFT_ALIGNMENT);
+        passwordFields.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+        configureCompactField(registrationPasswordField, "Mật khẩu đăng ký");
+        configureCompactField(confirmPasswordField, "Xác nhận mật khẩu");
+        passwordFields.add(registrationPasswordField);
+        passwordFields.add(confirmPasswordField);
+        card.add(passwordFields);
+
+        JPanel passwordErrors = new JPanel(new GridLayout(1, 2, 10, 0));
+        passwordErrors.setOpaque(false);
+        passwordErrors.setAlignmentX(LEFT_ALIGNMENT);
+        passwordErrors.setMaximumSize(new Dimension(Integer.MAX_VALUE, 20));
+        passwordErrors.add(registrationPasswordError);
+        passwordErrors.add(confirmPasswordError);
+        card.add(passwordErrors);
+
+        JCheckBox showPassword = compactCheckBox("Hiện mật khẩu");
+        char passwordEcho = registrationPasswordField.getEchoChar();
+        char confirmEcho = confirmPasswordField.getEchoChar();
+        showPassword.addActionListener(event -> {
+            registrationPasswordField.setEchoChar(showPassword.isSelected() ? (char) 0 : passwordEcho);
+            confirmPasswordField.setEchoChar(showPassword.isSelected() ? (char) 0 : confirmEcho);
+        });
+        card.add(showPassword);
+
+        configureCheckBox(termsCheckBox);
+        card.add(termsCheckBox);
+        card.add(termsError);
+        return card;
+    }
+
+    private static JPanel verticalCard() {
+        JPanel card = new JPanel();
+        card.setOpaque(false);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        return card;
+    }
+
     private void configureField(JTextField field, String accessibleName) {
         field.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 16));
         field.setForeground(INK);
@@ -200,6 +280,28 @@ public final class LoginFrame extends JFrame {
         field.getAccessibleContext().setAccessibleName(accessibleName);
     }
 
+    private void configureCompactField(JTextField field, String accessibleName) {
+        configureField(field, accessibleName);
+        field.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+        field.setPreferredSize(new Dimension(420, 48));
+    }
+
+    private static JCheckBox compactCheckBox(String text) {
+        JCheckBox checkBox = new JCheckBox(text);
+        configureCheckBox(checkBox);
+        return checkBox;
+    }
+
+    private static void configureCheckBox(JCheckBox checkBox) {
+        checkBox.setOpaque(false);
+        checkBox.setForeground(MUTED);
+        checkBox.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
+        checkBox.setFocusPainted(true);
+        checkBox.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        checkBox.setAlignmentX(LEFT_ALIGNMENT);
+        checkBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+    }
+
     private void setMode(boolean signUp) {
         signUpMode = signUp;
         modeSwitch.setSignUp(signUp);
@@ -208,11 +310,19 @@ public final class LoginFrame extends JFrame {
                 ? "Tham gia Java Chat và bắt đầu cuộc trò chuyện đầu tiên."
                 : "Đăng nhập để tiếp tục trò chuyện cùng bạn bè.");
         submitButton.setText(signUp ? "Tạo tài khoản" : "Đăng nhập");
+        authCardLayout.show(authCards, signUp ? "register" : "login");
         clearErrors();
+        javax.swing.SwingUtilities.invokeLater(() ->
+                (signUp ? fullNameField : loginField).requestFocusInWindow());
     }
 
     private void submit() {
         clearErrors();
+        if (signUpMode) {
+            submitRegistration();
+            return;
+        }
+
         String login = loginField.getText().trim();
         String password = new String(passwordField.getPassword());
         boolean valid = true;
@@ -238,12 +348,62 @@ public final class LoginFrame extends JFrame {
         timer.start();
     }
 
+    private void submitRegistration() {
+        String fullName = fullNameField.getText().trim();
+        String email = registrationEmailField.getText().trim();
+        String password = new String(registrationPasswordField.getPassword());
+        String confirmation = new String(confirmPasswordField.getPassword());
+        boolean valid = true;
+
+        if (fullName.length() < 2) {
+            showFieldError(fullNameField, fullNameError, "Vui lòng nhập họ tên.");
+            valid = false;
+        }
+        if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            showFieldError(registrationEmailField, registrationEmailError, "Email chưa hợp lệ.");
+            valid = false;
+        }
+        if (password.length() < 8) {
+            showFieldError(registrationPasswordField, registrationPasswordError, "Tối thiểu 8 ký tự.");
+            valid = false;
+        }
+        if (!confirmation.equals(password)) {
+            showFieldError(confirmPasswordField, confirmPasswordError, "Mật khẩu chưa khớp.");
+            valid = false;
+        }
+        if (!termsCheckBox.isSelected()) {
+            termsError.setText("Bạn cần đồng ý với điều khoản để tiếp tục.");
+            valid = false;
+        }
+        if (!valid) return;
+
+        submitButton.setEnabled(false);
+        submitButton.setText("Đang tạo tài khoản...");
+        setStatus("Đang thiết lập tài khoản an toàn...", false);
+        Timer timer = new Timer(500, event -> {
+            ((Timer) event.getSource()).stop();
+            dispose();
+            onAuthenticated.run();
+        });
+        timer.setRepeats(false);
+        timer.start();
+    }
+
     private void clearErrors() {
         loginError.setText(" ");
         passwordError.setText(" ");
+        fullNameError.setText(" ");
+        registrationEmailError.setText(" ");
+        registrationPasswordError.setText(" ");
+        confirmPasswordError.setText(" ");
+        termsError.setText(" ");
         formStatus.setText(" ");
         setInvalid(loginField, false);
         setInvalid(passwordField, false);
+        setInvalid(fullNameField, false);
+        setInvalid(registrationEmailField, false);
+        setInvalid(registrationPasswordField, false);
+        setInvalid(confirmPasswordField, false);
     }
 
     private void showFieldError(JTextField field, JLabel label, String message) {
