@@ -8,6 +8,7 @@ import com.javachat.shared.model.ChatMessageType;
 import com.javachat.shared.model.Conversation;
 import com.javachat.shared.model.ConversationType;
 import com.javachat.user.ui.chat.MainFrame;
+import com.javachat.user.ui.auth.LoginFrame;
 
 import javax.swing.SwingUtilities;
 import java.time.Instant;
@@ -23,9 +24,13 @@ public final class UserClientApp {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            MainFrame frame = new MainFrame();
-            if (List.of(args).contains("--demo")) setupDemo(frame);
-            frame.setVisible(true);
+            boolean demo = List.of(args).contains("--demo");
+            LoginFrame login = new LoginFrame(() -> {
+                MainFrame frame = new MainFrame();
+                if (demo) setupDemo(frame);
+                frame.setVisible(true);
+            });
+            login.setVisible(true);
         });
     }
 
