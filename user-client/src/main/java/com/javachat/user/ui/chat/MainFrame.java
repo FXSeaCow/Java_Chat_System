@@ -4,16 +4,25 @@ import com.javachat.shared.dto.ChatDtos.ConversationSummary;
 import com.javachat.shared.dto.ChatDtos.MessageSendRequest;
 import com.javachat.shared.dto.AiDtos;
 import com.javachat.shared.model.ChatMessage;
+import com.javachat.shared.dto.AuthDtos.PresenceChangedEvent;
+import com.javachat.shared.dto.FriendDtos.FriendListResponse;
+import com.javachat.shared.dto.FriendDtos.RespondRequest;
+import com.javachat.shared.model.User;
+import com.javachat.user.ui.friends.FriendListPanel;
+import com.javachat.user.ui.friends.FriendRequestsPanel;
+import com.javachat.user.ui.friends.OnlineFriendsPanel;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JFrame;
+import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.CardLayout;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics;
@@ -31,6 +40,11 @@ public final class MainFrame extends JFrame {
     private static final Color CANVAS = new Color(238, 245, 252);
 
     private final ConversationListPanel conversations = new ConversationListPanel();
+    private final FriendListPanel friends = new FriendListPanel();
+    private final FriendRequestsPanel friendRequests = new FriendRequestsPanel();
+    private final OnlineFriendsPanel onlineFriends = new OnlineFriendsPanel();
+    private final CardLayout pages = new CardLayout();
+    private final JPanel pageContainer = new JPanel(pages);
     private final JPanel detail = new JPanel(new BorderLayout());
     private final ChatPanel chat = new ChatPanel();
     private Consumer<ConversationSummary> openConversation = ignored -> { };
@@ -43,9 +57,30 @@ public final class MainFrame extends JFrame {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
         getContentPane().setBackground(Color.WHITE);
-        add(conversations, BorderLayout.WEST);
+        JPanel navigation = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 12, 8));
+        navigation.setBackground(Color.WHITE);
+        JButton chatsButton = new JButton("Tin nhắn");
+        JButton friendsButton = new JButton("Bạn bè");
+        JButton onlineButton = new JButton("Đang online");
+        JButton requestsButton = new JButton("Lời mời kết bạn");
+        chatsButton.addActionListener(event -> showChats());
+        friendsButton.addActionListener(event -> showFriends());
+        onlineButton.addActionListener(event -> showOnlineFriends());
+        requestsButton.addActionListener(event -> showFriendRequests());
+        navigation.add(chatsButton);
+        navigation.add(friendsButton);
+        navigation.add(onlineButton);
+        navigation.add(requestsButton);
+        add(navigation, BorderLayout.NORTH);
+        JPanel chatPage = new JPanel(new BorderLayout());
+        chatPage.add(conversations, BorderLayout.WEST);
         detail.setBackground(CANVAS);
-        add(detail, BorderLayout.CENTER);
+        chatPage.add(detail, BorderLayout.CENTER);
+        pageContainer.add(chatPage, "chats");
+        pageContainer.add(friends, "friends");
+        pageContainer.add(onlineFriends, "online");
+        pageContainer.add(friendRequests, "requests");
+        add(pageContainer, BorderLayout.CENTER);
         showWelcome();
         conversations.setSelectionListener(this::selectConversation);
     }
@@ -53,6 +88,61 @@ public final class MainFrame extends JFrame {
     /** Supply results from CONVERSATION_LIST_RESPONSE on the Swing event dispatch thread. */
     public void setConversations(List<ConversationSummary> items) {
         conversations.setConversations(items);
+    }
+
+    /** Supply FRIEND_LIST_RESPONSE on the Swing event dispatch thread. */
+    public void setFriendList(FriendListResponse response) {
+        friends.setFriendList(response);
+        friendRequests.setFriendList(response);
+        onlineFriends.setFriendList(response);
+    }
+
+    /** Initial set of online user IDs, if the application has a presence snapshot. */
+    public void setOnlineUserIds(java.util.Collection<Long> userIds) {
+        onlineFriends.setOnlineUserIds(userIds);
+    }
+
+    /** Apply USER_PRESENCE_CHANGED_EVENT on the Swing event dispatch thread. */
+    public void applyPresence(PresenceChangedEvent event) {
+        onlineFriends.applyPresence(event);
+    }
+
+    public void setFriendRequestUsers(List<User> users) {
+        friendRequests.setRequestUsers(users);
+    }
+
+    public void setRespondFriendRequestListener(Consumer<RespondRequest> listener) {
+        friendRequests.setRespondRequestListener(listener);
+    }
+
+    public void setFriendRequestResponseError(long friendshipId) {
+        friendRequests.setResponseError(friendshipId);
+    }
+
+    public void setOpenFriendConversationListener(Consumer<User> listener) {
+        friends.setOpenConversationListener(listener);
+        onlineFriends.setOpenConversationListener(listener);
+    }
+
+    public void showFriends() {
+        pages.show(pageContainer, "friends");
+    }
+
+    public void showOnlineFriends() {
+        pages.show(pageContainer, "online");
+    }
+
+    public void showFriendRequests() {
+        pages.show(pageContainer, "requests");
+    }
+
+    public void showChats() {
+        pages.show(pageContainer, "chats");
+    }
+
+    /** Open an existing direct conversation chosen from the friends screen. */
+    public void openConversation(ConversationSummary conversation) {
+        if (conversation != null) conversations.selectConversation(conversation.conversation().id());
     }
 
     public void setOpenConversationListener(Consumer<ConversationSummary> listener) {
@@ -96,6 +186,7 @@ public final class MainFrame extends JFrame {
             return;
         }
         detail.removeAll();
+        showChats();
         chat.setConversation(item);
         detail.add(chat, BorderLayout.CENTER);
         detail.revalidate();

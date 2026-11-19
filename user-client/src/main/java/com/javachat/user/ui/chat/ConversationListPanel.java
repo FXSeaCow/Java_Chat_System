@@ -155,6 +155,17 @@ public final class ConversationListPanel extends JPanel {
         selectionListener = listener == null ? ignored -> { } : listener;
     }
 
+    public void selectConversation(long conversationId) {
+        for (int i = 0; i < model.size(); i++) {
+            if (model.get(i).conversation().id() == conversationId) {
+                if (list.getSelectedIndex() == i) selectionListener.accept(model.get(i));
+                else list.setSelectedIndex(i);
+                list.ensureIndexIsVisible(i);
+                return;
+            }
+        }
+    }
+
     /** Call on the Swing event dispatch thread after receiving a list response. */
     public void setConversations(List<ConversationSummary> conversations) {
         long selectedId = list.getSelectedValue() == null ? -1 : list.getSelectedValue().conversation().id();

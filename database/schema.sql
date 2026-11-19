@@ -24,8 +24,11 @@ CREATE TABLE users (
     username        VARCHAR(50) NOT NULL,
     email           VARCHAR(255) NOT NULL,
     password_hash   VARCHAR(255) NOT NULL,
-    display_name    VARCHAR(100) NOT NULL,
+    display_name    VARCHAR(100) NOT NULL,          -- họ tên
     avatar_url      VARCHAR(2048) NULL,
+    address         VARCHAR(255) NULL,
+    date_of_birth   DATE NULL,
+    gender          VARCHAR(10) NULL,
     role            VARCHAR(20) NOT NULL DEFAULT 'USER',
     status          VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     created_at      DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -36,7 +39,8 @@ CREATE TABLE users (
     CONSTRAINT uk_users_username UNIQUE (username),
     CONSTRAINT uk_users_email UNIQUE (email),
     CONSTRAINT ck_users_role CHECK (role IN ('USER', 'ADMIN')),
-    CONSTRAINT ck_users_status CHECK (status IN ('ACTIVE', 'BLOCKED', 'DELETED'))
+    CONSTRAINT ck_users_status CHECK (status IN ('ACTIVE', 'BLOCKED', 'DELETED')),
+    CONSTRAINT ck_users_gender CHECK (gender IN ('MALE', 'FEMALE', 'OTHER'))
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci;
 
 CREATE TABLE auth_sessions (

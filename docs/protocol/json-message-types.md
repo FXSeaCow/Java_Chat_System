@@ -31,6 +31,9 @@ Mọi message sử dụng cùng một cấu trúc ngoài:
 | `authToken` | string/null | Tùy loại | Không gửi trong login/register; bắt buộc với request cần đăng nhập. |
 | `payload` | object/null | Có | Dữ liệu riêng của message; dùng `{}` nếu không có dữ liệu. |
 
+Trong `payload`, ngày không kèm giờ (như `dateOfBirth`) dùng ISO-8601 dạng
+`yyyy-MM-dd`, ví dụ `2004-03-12`; `gender` là `MALE`, `FEMALE` hoặc `OTHER`.
+
 ## 2. Nhóm message
 
 - `REQUEST`: client yêu cầu server thực hiện một thao tác.
@@ -67,7 +70,7 @@ chúng không được lưu vào cơ sở dữ liệu.
 | `AUTH_LOGOUT_REQUEST` / `AUTH_LOGOUT_RESPONSE` | Request/Response | Đăng xuất và thu hồi token. |
 | `AUTH_SESSION_EXPIRED_EVENT` | Event | Báo client phiên đã hết hạn hoặc bị thu hồi. |
 | `PROFILE_GET_REQUEST` / `PROFILE_GET_RESPONSE` | Request/Response | Lấy hồ sơ người dùng. |
-| `PROFILE_UPDATE_REQUEST` / `PROFILE_UPDATE_RESPONSE` | Request/Response | Cập nhật tên hiển thị và avatar. |
+| `PROFILE_UPDATE_REQUEST` / `PROFILE_UPDATE_RESPONSE` | Request/Response | Cập nhật họ tên, avatar, địa chỉ, ngày sinh và giới tính. |
 | `USER_PRESENCE_CHANGED_EVENT` | Event | Trạng thái online/offline của người dùng thay đổi. |
 
 ### 3.3 Friends
