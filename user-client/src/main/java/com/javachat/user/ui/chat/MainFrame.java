@@ -7,10 +7,20 @@ import com.javachat.shared.model.ChatMessage;
 import com.javachat.shared.dto.AuthDtos.PresenceChangedEvent;
 import com.javachat.shared.dto.FriendDtos.FriendListResponse;
 import com.javachat.shared.dto.FriendDtos.RespondRequest;
-import com.javachat.shared.model.User;
 import com.javachat.user.ui.friends.FriendListPanel;
 import com.javachat.user.ui.friends.FriendRequestsPanel;
 import com.javachat.user.ui.friends.OnlineFriendsPanel;
+import com.javachat.shared.model.User;
+import com.javachat.shared.dto.FriendDtos.SendRequest;
+import com.javachat.user.ui.friends.PeopleSearchPanel;
+import com.javachat.user.ui.groups.GroupCreatePanel;
+import com.javachat.user.ui.groups.GroupManagementPanel;
+import com.javachat.shared.dto.GroupDtos.GroupCreateRequest;
+import com.javachat.shared.dto.GroupDtos.GroupUpdateRequest;
+import com.javachat.shared.dto.GroupDtos.MemberRemoveRequest;
+import com.javachat.shared.dto.GroupDtos.MemberRoleUpdateRequest;
+import com.javachat.shared.model.ConversationMember;
+import com.javachat.shared.model.GroupDetails;
 
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -30,6 +40,7 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.RoundRectangle2D;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /** Main chat shell: conversation list on the left, chat panel on the right. */
@@ -47,6 +58,9 @@ public final class MainFrame extends JFrame {
     private final JPanel pageContainer = new JPanel(pages);
     private final JPanel detail = new JPanel(new BorderLayout());
     private final ChatPanel chat = new ChatPanel();
+    private final PeopleSearchPanel peopleSearch = new PeopleSearchPanel();
+    private final GroupCreatePanel groupCreate = new GroupCreatePanel();
+    private final GroupManagementPanel groupManagement = new GroupManagementPanel();
     private Consumer<ConversationSummary> openConversation = ignored -> { };
 
     public MainFrame() {
@@ -83,6 +97,9 @@ public final class MainFrame extends JFrame {
         add(pageContainer, BorderLayout.CENTER);
         showWelcome();
         conversations.setSelectionListener(this::selectConversation);
+        conversations.setFindPeopleListener(this::showPeopleSearch);
+        conversations.setCreateGroupListener(() -> showDetail(groupCreate));
+        conversations.setManageGroupListener(() -> showDetail(groupManagement));
     }
 
     /** Supply results from CONVERSATION_LIST_RESPONSE on the Swing event dispatch thread. */
@@ -178,6 +195,34 @@ public final class MainFrame extends JFrame {
 
     public void setAiSuggestionError(long conversationId, String message) {
         chat.setAiSuggestionError(conversationId, message);
+    }
+
+    public void setPeople(List<User> people) { peopleSearch.setPeople(people); }
+    public void setFriendIds(Set<Long> ids) { peopleSearch.setFriendIds(ids); }
+    public void setPendingFriendIds(Set<Long> ids) { peopleSearch.setPendingIds(ids); }
+    public void setPeopleSearchListener(Consumer<String> listener) { peopleSearch.setSearchListener(listener); }
+    public void setAddFriendListener(Consumer<SendRequest> listener) { peopleSearch.setAddFriendListener(listener); }
+    public void markFriendRequestSent(long userId) { peopleSearch.markRequestSent(userId); }
+    public void setGroupCandidates(List<User> users) { groupCreate.setAvailableMembers(users); groupManagement.setUsers(users); }
+    public void setGroups(List<GroupDetails> groups) { groupManagement.setGroups(groups); }
+    public void setGroupMembers(List<ConversationMember> members) { groupManagement.setMembers(members); }
+    public void setCreateGroupListener(Consumer<GroupCreateRequest> listener) { groupCreate.setCreateListener(listener); }
+    public void setGroupSelectedListener(Consumer<Long> listener) { groupManagement.setGroupSelectedListener(listener); }
+    public void setUpdateGroupListener(Consumer<GroupUpdateRequest> listener) { groupManagement.setUpdateListener(listener); }
+    public void setRemoveGroupMemberListener(Consumer<MemberRemoveRequest> listener) { groupManagement.setRemoveListener(listener); }
+    public void setMemberRoleListener(Consumer<MemberRoleUpdateRequest> listener) { groupManagement.setRoleListener(listener); }
+
+    private void showPeopleSearch() {
+        showDetail(peopleSearch);
+        peopleSearch.focusSearch();
+    }
+
+    private void showDetail(JPanel panel) {
+        conversations.clearSelection();
+        detail.removeAll();
+        detail.add(panel, BorderLayout.CENTER);
+        detail.revalidate();
+        detail.repaint();
     }
 
     private void selectConversation(ConversationSummary item) {

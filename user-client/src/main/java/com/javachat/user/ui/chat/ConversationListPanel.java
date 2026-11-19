@@ -12,6 +12,8 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JPopupMenu;
+import javax.swing.JMenuItem;
 import javax.swing.JTextField;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
@@ -28,6 +30,8 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -62,16 +66,21 @@ public final class ConversationListPanel extends JPanel {
             g.setColor(MUTED);
             g.setFont(getFont());
             var metrics = g.getFontMetrics();
-            g.drawString("Tìm hội thoại", 0, (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
+            g.drawString("Tìm hội thoại", getInsets().left,
+                    (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
             g.dispose();
         }
     };
     private final PillButton allButton = new PillButton("Tất cả");
     private final PillButton unreadButton = new PillButton("Chưa đọc");
+    private final JButton actionsButton = new JButton("⋯");
     private final JLabel empty = new JLabel("Chưa có hội thoại", SwingConstants.CENTER);
     private final JPanel center = new JPanel(new BorderLayout());
     private boolean unreadOnly;
     private Consumer<ConversationSummary> selectionListener = ignored -> { };
+    private Runnable findPeopleListener = () -> { };
+    private Runnable createGroupListener = () -> { };
+    private Runnable manageGroupListener = () -> { };
 
     public ConversationListPanel() {
         super(new BorderLayout());
@@ -94,8 +103,32 @@ public final class ConversationListPanel extends JPanel {
         JLabel heading = new JLabel("Tin nhắn");
         heading.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 25));
         heading.setForeground(INK);
-        heading.setAlignmentX(LEFT_ALIGNMENT);
-        top.add(heading);
+        JPanel headingRow = new JPanel(new BorderLayout());
+        headingRow.setOpaque(false);
+        headingRow.setAlignmentX(LEFT_ALIGNMENT);
+        headingRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        headingRow.add(heading, BorderLayout.WEST);
+        actionsButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
+        actionsButton.setForeground(MUTED);
+        actionsButton.setBackground(Color.WHITE);
+        actionsButton.setFocusPainted(false);
+        actionsButton.setToolTipText("Mở các chức năng khác");
+        actionsButton.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        actionsButton.setPreferredSize(new Dimension(42, 34));
+        actionsButton.setBorder(BorderFactory.createLineBorder(BORDER));
+        JPopupMenu actions = new JPopupMenu();
+        JMenuItem findPeople = new JMenuItem("Tìm người");
+        JMenuItem createGroup = new JMenuItem("Tạo nhóm chat");
+        JMenuItem manageGroup = new JMenuItem("Quản lý nhóm chat");
+        findPeople.addActionListener(event -> findPeopleListener.run());
+        createGroup.addActionListener(event -> createGroupListener.run());
+        manageGroup.addActionListener(event -> manageGroupListener.run());
+        actions.add(findPeople);
+        actions.add(createGroup);
+        actions.add(manageGroup);
+        actionsButton.addActionListener(event -> actions.show(actionsButton, 0, actionsButton.getHeight()));
+        headingRow.add(actionsButton, BorderLayout.EAST);
+        top.add(headingRow);
         top.add(Box.createVerticalStrut(18));
 
         JPanel searchBox = new RoundedPanel(new Color(245, 248, 252), 14);
@@ -105,12 +138,22 @@ public final class ConversationListPanel extends JPanel {
         searchBox.setPreferredSize(new Dimension(300, 42));
         searchBox.setAlignmentX(LEFT_ALIGNMENT);
         searchBox.add(new SearchGlyph(), BorderLayout.WEST);
-        search.setBorder(null);
+        search.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 0));
         search.setOpaque(false);
         search.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
         search.setForeground(INK);
-        search.putClientProperty("JTextField.placeholderText", "Tìm hội thoại");
         search.setToolTipText("Tìm theo tên hoặc nội dung tin nhắn");
+        search.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent event) {
+                search.repaint();
+            }
+
+            @Override
+            public void focusLost(FocusEvent event) {
+                search.repaint();
+            }
+        });
         searchBox.add(search, BorderLayout.CENTER);
         top.add(searchBox);
         top.add(Box.createVerticalStrut(16));
@@ -164,6 +207,22 @@ public final class ConversationListPanel extends JPanel {
                 return;
             }
         }
+    }
+
+    public void setFindPeopleListener(Runnable listener) {
+        findPeopleListener = listener == null ? () -> { } : listener;
+    }
+
+    public void setCreateGroupListener(Runnable listener) {
+        createGroupListener = listener == null ? () -> { } : listener;
+    }
+
+    public void setManageGroupListener(Runnable listener) {
+        manageGroupListener = listener == null ? () -> { } : listener;
+    }
+
+    public void clearSelection() {
+        list.clearSelection();
     }
 
     /** Call on the Swing event dispatch thread after receiving a list response. */
@@ -379,8 +438,9 @@ public final class ConversationListPanel extends JPanel {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setColor(MUTED);
             g.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.drawOval(2, 2, 10, 10);
-            g.drawLine(11, 11, 17, 17);
+            int y = (getHeight() - 19) / 2;
+            g.drawOval(2, y + 1, 10, 10);
+            g.drawLine(11, y + 10, 17, y + 16);
             g.dispose();
         }
     }

@@ -16,6 +16,9 @@ import com.javachat.shared.model.PresenceStatus;
 import com.javachat.shared.model.User;
 import com.javachat.shared.model.UserRole;
 import com.javachat.shared.model.UserStatus;
+import com.javachat.shared.model.GroupDetails;
+import com.javachat.shared.model.ConversationMember;
+import com.javachat.shared.model.MemberRole;
 import com.javachat.user.ui.chat.MainFrame;
 
 import javax.swing.SwingUtilities;
@@ -27,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.Set;
 
 public final class UserClientApp {
     private UserClientApp() { }
@@ -83,6 +87,17 @@ public final class UserClientApp {
                     .filter(item -> item.conversation().id() == conversationId)
                     .findFirst().orElse(null));
         });
+        frame.setPeople(demoPeople(now));
+        frame.setGroupCandidates(demoPeople(now));
+        frame.setGroups(List.of(new GroupDetails(2L, 1L, "Nhóm Java Chat", null,
+                "Nhóm trao đổi đồ án Java", now.minus(12, ChronoUnit.DAYS))));
+        frame.setGroupMembers(List.of(
+                new ConversationMember(2L, 11L, MemberRole.OWNER, now.minus(12, ChronoUnit.DAYS), null, now),
+                new ConversationMember(2L, 12L, MemberRole.ADMIN, now.minus(10, ChronoUnit.DAYS), null, now),
+                new ConversationMember(2L, 13L, MemberRole.MEMBER, now.minus(8, ChronoUnit.DAYS), null, now)));
+        frame.setFriendIds(Set.of(12L));
+        frame.setPendingFriendIds(Set.of(13L));
+        frame.setAddFriendListener(request -> frame.markFriendRequestSent(request.addresseeId()));
         frame.setOpenConversationListener(item -> frame.setMessages(item.conversation().id(),
                 history.getOrDefault(item.conversation().id(), List.of())));
         frame.setSendMessageListener(request -> {
@@ -95,6 +110,14 @@ public final class UserClientApp {
         frame.setAiSuggestionListener(request -> frame.setAiSuggestionResult(request.conversationId(),
                 new AiDtos.ChatResponse(1L, "Mình đã xem tin nhắn của bạn. Mình sẽ phản hồi chi tiết ngay nhé!",
                         "Demo (câu trả lời mẫu)", 0, 0)));
+    }
+
+    private static List<User> demoPeople(Instant now) {
+        return List.of(
+                demoFriend(11L, "minhanh", "Nguyễn Minh Anh", now),
+                demoFriend(12L, "giahuy", "Trần Gia Huy", now),
+                demoFriend(13L, "thao.nguyen", "Nguyễn Thu Thảo", now),
+                demoFriend(14L, "hoangnam", "Lê Hoàng Nam", now));
     }
 
     private static List<ConversationSummary> demoConversations(Instant now) {
