@@ -7,6 +7,7 @@ import com.javachat.shared.model.PresenceStatus;
 import com.javachat.user.mock.MockChatStore;
 import com.javachat.user.net.LiveApiClient;
 import com.javachat.user.ui.chat.MainFrame;
+import com.javachat.user.ui.auth.LoginFrame;
 
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -23,13 +24,17 @@ public final class UserClientApp {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-            MainFrame frame = new MainFrame();
-            frame.setVisible(true);
-            if (List.of(args).contains("--demo")) {
-                bind(frame, new MockChatStore(), null);
-            } else {
-                loadLive(frame);
-            }
+            boolean demo = List.of(args).contains("--demo");
+            LoginFrame login = new LoginFrame(() -> {
+                MainFrame frame = new MainFrame();
+                frame.setVisible(true);
+                if (demo) {
+                    bind(frame, new MockChatStore(), null);
+                } else {
+                    loadLive(frame);
+                }
+            });
+            login.setVisible(true);
         });
     }
 
