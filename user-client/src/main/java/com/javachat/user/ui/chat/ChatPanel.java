@@ -7,6 +7,7 @@ import com.javachat.shared.model.ChatMessage;
 import com.javachat.shared.model.ChatMessageStatus;
 import com.javachat.shared.model.ChatMessageType;
 import com.javachat.shared.model.ConversationType;
+import com.javachat.shared.model.MessageAttachment;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
@@ -20,6 +21,8 @@ import javax.swing.JScrollPane;
 import javax.swing.Scrollable;
 import javax.swing.JTextArea;
 import javax.swing.KeyStroke;
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingConstants;
 import javax.swing.event.DocumentEvent;
@@ -47,11 +50,13 @@ import java.util.function.Consumer;
 
 /** Chat detail UI. Network and history loading are supplied by MainFrame's callbacks. */
 public final class ChatPanel extends JPanel {
-    private static final Color INK = new Color(30, 48, 72);
-    private static final Color MUTED = new Color(113, 132, 157);
-    private static final Color BLUE = new Color(45, 112, 220);
-    private static final Color CANVAS = new Color(238, 245, 252);
-    private static final Color BORDER = new Color(220, 232, 244);
+    private static final Color INK = ChatTheme.INK;
+    private static final Color MUTED = ChatTheme.MUTED;
+    private static final Color BLUE = ChatTheme.TEAL;
+    private static final Color SKY = ChatTheme.TEAL;
+    private static final Color CANVAS = ChatTheme.CREAM;
+    private static final Color INPUT = ChatTheme.MILK;
+    private static final Color BORDER = ChatTheme.BORDER;
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -92,7 +97,7 @@ public final class ChatPanel extends JPanel {
         setBackground(CANVAS);
         messageList.setLayout(new BoxLayout(messageList, BoxLayout.Y_AXIS));
         messageList.setBackground(CANVAS);
-        messageList.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+        messageList.setBorder(BorderFactory.createEmptyBorder(12, 33, 20, 33));
         scroll = new JScrollPane(messageList);
         scroll.setBorder(null);
         scroll.getViewport().setBackground(CANVAS);
@@ -104,6 +109,7 @@ public final class ChatPanel extends JPanel {
         footer = createComposer();
         south.add(aiPanel, BorderLayout.NORTH);
         south.add(footer, BorderLayout.SOUTH);
+        south.setBackground(CANVAS);
         aiPanel.setVisible(false);
         aiPanel.setGenerateAction(this::requestAiSuggestion);
         aiPanel.setInsertAction(this::insertAiSuggestion);
@@ -203,33 +209,64 @@ public final class ChatPanel extends JPanel {
 
     private JPanel createHeader(ConversationSummary item) {
         JPanel header = new JPanel(new BorderLayout(12, 0));
-        header.setBackground(Color.WHITE);
+        header.setBackground(ChatTheme.MILK);
         header.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER),
-                BorderFactory.createEmptyBorder(17, 26, 17, 26)));
+                BorderFactory.createEmptyBorder(11, 20, 11, 20)));
         String title = ConversationListPanel.title(item);
         header.add(new ConversationListPanel.Avatar(title,
-                item.conversation().type() == ConversationType.GROUP, 42), BorderLayout.WEST);
+                item.conversation().type() == ConversationType.GROUP, 30), BorderLayout.WEST);
         JPanel labels = new JPanel();
         labels.setOpaque(false);
         labels.setLayout(new BoxLayout(labels, BoxLayout.Y_AXIS));
         JLabel name = new JLabel(title);
-        name.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 16));
+        name.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
         name.setForeground(INK);
         JLabel type = new JLabel(item.conversation().type() == ConversationType.GROUP
-                ? "Hội thoại nhóm" : "Hội thoại riêng");
-        type.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
-        type.setForeground(MUTED);
+                ? "● Nhóm chat" : "● Đang hoạt động");
+        type.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 9));
+        type.setForeground(ChatTheme.TEAL_DARK);
         labels.add(name);
         labels.add(Box.createVerticalStrut(3));
         labels.add(type);
         header.add(labels, BorderLayout.CENTER);
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        actions.setOpaque(false);
         JButton find = new SearchButton();
-        find.setPreferredSize(new Dimension(38, 38));
+        find.setPreferredSize(new Dimension(25, 25));
         find.setToolTipText("Tìm trong lịch sử chat");
         find.addActionListener(event -> showSearch(!searchOpen));
-        header.add(find, BorderLayout.EAST);
+        actions.add(find);
+        JButton call = headerIcon("☎", "Chức năng gọi đang phát triển");
+        call.setEnabled(false);
+        actions.add(call);
+        JButton more = headerIcon("⋯", "Tùy chọn");
+        JPopupMenu menu = new JPopupMenu();
+        JMenuItem searchItem = new JMenuItem("Tìm trong hội thoại");
+        searchItem.addActionListener(event -> showSearch(true));
+        JMenuItem aiItem = new JMenuItem("Gợi ý AI");
+        aiItem.addActionListener(event -> {
+            aiPanel.setVisible(true);
+            south.revalidate();
+        });
+        menu.add(searchItem);
+        menu.add(aiItem);
+        more.addActionListener(event -> menu.show(more, 0, more.getHeight()));
+        actions.add(more);
+        header.add(actions, BorderLayout.EAST);
         return header;
+    }
+
+    private static JButton headerIcon(String symbol, String tooltip) {
+        JButton button = new JButton(symbol);
+        button.setPreferredSize(new Dimension(25, 25));
+        button.setToolTipText(tooltip);
+        button.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 17));
+        button.setForeground(INK);
+        button.setBorder(null);
+        button.setContentAreaFilled(false);
+        button.setFocusPainted(false);
+        return button;
     }
 
     private void showSearch(boolean visible) {
@@ -254,21 +291,19 @@ public final class ChatPanel extends JPanel {
     }
 
     private JPanel createComposer() {
-        JPanel footer = new JPanel(new BorderLayout(12, 0));
-        footer.setBackground(Color.WHITE);
-        footer.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER),
-                BorderFactory.createEmptyBorder(14, 20, 14, 20)));
-        JPanel input = new Bubble(new Color(245, 248, 252), 20);
+        JPanel footer = new JPanel(new BorderLayout());
+        footer.setBackground(CANVAS);
+        footer.setBorder(BorderFactory.createEmptyBorder(10, 15, 14, 15));
+        JPanel input = new Bubble(INPUT, 14);
         input.setLayout(new BorderLayout());
-        input.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
+        input.setBorder(BorderFactory.createEmptyBorder(7, 9, 7, 9));
         composer.setLineWrap(true);
         composer.setWrapStyleWord(true);
         composer.setOpaque(false);
         composer.setBorder(null);
         composer.setForeground(INK);
-        composer.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
-        composer.setRows(2);
+        composer.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+        composer.setRows(1);
         composer.setToolTipText("Nhấn Enter để gửi, Shift+Enter để xuống dòng");
         composer.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke("ENTER"), "send-message");
         composer.getActionMap().put("send-message", new AbstractAction() {
@@ -280,22 +315,37 @@ public final class ChatPanel extends JPanel {
             public void removeUpdate(DocumentEvent event) { updateSendState(); }
             public void changedUpdate(DocumentEvent event) { updateSendState(); }
         });
-        input.add(composer, BorderLayout.CENTER);
-        footer.add(input, BorderLayout.CENTER);
-        sendButton.setPreferredSize(new Dimension(46, 46));
-        sendButton.setToolTipText("Gửi tin nhắn");
-        sendButton.addActionListener(event -> sendMessage());
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        buttons.setOpaque(false);
-        JButton aiButton = new JButton("✦ Gợi ý AI");
-        aiButton.setToolTipText("Tạo câu trả lời gợi ý từ các tin nhắn gần đây");
-        aiButton.addActionListener(event -> {
+        JButton addButton = new JButton("+");
+        addButton.setToolTipText("Gợi ý AI");
+        addButton.setForeground(SKY);
+        addButton.setBackground(ChatTheme.TEAL_PALE);
+        addButton.setBorder(BorderFactory.createEmptyBorder());
+        addButton.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 17));
+        addButton.setPreferredSize(new Dimension(27, 27));
+        addButton.addActionListener(event -> {
             aiPanel.setVisible(!aiPanel.isVisible());
             south.revalidate();
         });
-        buttons.add(aiButton);
-        buttons.add(sendButton);
-        footer.add(buttons, BorderLayout.EAST);
+        input.add(addButton, BorderLayout.WEST);
+        composer.setBorder(BorderFactory.createEmptyBorder(7, 10, 0, 0));
+        input.add(composer, BorderLayout.CENTER);
+        sendButton.setPreferredSize(new Dimension(30, 30));
+        sendButton.setToolTipText("Gửi tin nhắn");
+        sendButton.addActionListener(event -> sendMessage());
+        JPanel trailing = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        trailing.setOpaque(false);
+        JButton emoji = headerIcon("😊", "Chèn emoji");
+        JPopupMenu emojis = new JPopupMenu();
+        for (String symbol : new String[] {"😊", "❤️", "👍", "😂", "🎉"}) {
+            JMenuItem choice = new JMenuItem(symbol);
+            choice.addActionListener(event -> composer.insert(symbol, composer.getCaretPosition()));
+            emojis.add(choice);
+        }
+        emoji.addActionListener(event -> emojis.show(emoji, 0, -emojis.getPreferredSize().height));
+        trailing.add(emoji);
+        trailing.add(sendButton);
+        input.add(trailing, BorderLayout.EAST);
+        footer.add(input, BorderLayout.CENTER);
         updateSendState();
         return footer;
     }
@@ -377,7 +427,7 @@ public final class ChatPanel extends JPanel {
                 JPanel row = messageRow(message);
                 messageRows.put(message.id(), row);
                 messageList.add(row);
-                messageList.add(Box.createVerticalStrut(10));
+                messageList.add(Box.createVerticalStrut(15));
             }
         }
         messageList.revalidate();
@@ -390,9 +440,21 @@ public final class ChatPanel extends JPanel {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 4));
         row.setOpaque(false);
         row.setAlignmentX(LEFT_ALIGNMENT);
-        JLabel label = new JLabel(day.equals(LocalDate.now()) ? "Hôm nay" : DAY.format(day));
+        JLabel label = new JLabel(day.equals(LocalDate.now()) ? "HÔM NAY" : DAY.format(day)) {
+            @Override
+            protected void paintComponent(Graphics graphics) {
+                Graphics2D g = (Graphics2D) graphics.create();
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(ChatTheme.TEAL_PALE);
+                g.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+                g.dispose();
+                super.paintComponent(graphics);
+            }
+        };
         label.setForeground(MUTED);
-        label.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+        label.setOpaque(false);
+        label.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        label.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 9));
         row.add(label);
         return row;
     }
@@ -411,32 +473,78 @@ public final class ChatPanel extends JPanel {
             row.add(label);
             return row;
         }
-        JPanel bubble = new Bubble(own ? BLUE : Color.WHITE, 18, message.id() == focusedMessageId);
+        boolean hasFile = message.status() != ChatMessageStatus.DELETED
+                && message.messageType() == ChatMessageType.FILE && !message.attachments().isEmpty();
+        JPanel bubble = new Bubble(own && !hasFile ? BLUE : ChatTheme.MILK, 14,
+                message.id() == focusedMessageId);
         bubble.setLayout(new BoxLayout(bubble, BoxLayout.Y_AXIS));
-        bubble.setBorder(BorderFactory.createEmptyBorder(10, 14, 8, 14));
+        bubble.setBorder(BorderFactory.createEmptyBorder(9, 11, 9, 11));
         String body = content(message);
-        JTextArea text = new JTextArea(body);
-        text.setEditable(false);
-        text.setFocusable(false);
-        text.setOpaque(false);
-        text.setLineWrap(true);
-        text.setWrapStyleWord(true);
-        text.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
-        text.setForeground(own ? Color.WHITE : INK);
-        int width = Math.min(340, Math.max(70, longestLineWidth(text, body) + 8));
-        text.setSize(new Dimension(width, Short.MAX_VALUE));
-        Dimension textSize = text.getPreferredSize();
-        text.setPreferredSize(new Dimension(width, textSize.height));
-        bubble.add(text);
-        bubble.add(Box.createVerticalStrut(4));
+        if (hasFile) {
+            bubble.add(attachmentCard(message.attachments().get(0)));
+        } else {
+            JTextArea text = new JTextArea(body);
+            text.setEditable(false);
+            text.setFocusable(false);
+            text.setOpaque(false);
+            text.setLineWrap(true);
+            text.setWrapStyleWord(true);
+            text.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+            text.setForeground(own ? Color.WHITE : INK);
+            int width = Math.min(220, Math.max(70, longestLineWidth(text, body) + 8));
+            text.setSize(new Dimension(width, Short.MAX_VALUE));
+            Dimension textSize = text.getPreferredSize();
+            text.setPreferredSize(new Dimension(width, textSize.height));
+            bubble.add(text);
+        }
         JLabel time = new JLabel(message.createdAt() == null ? "" : TIME.format(
                 message.createdAt().atZone(ZoneId.systemDefault())));
-        time.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 10));
-        time.setForeground(own ? new Color(225, 238, 255) : MUTED);
+        time.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 9));
+        time.setForeground(MUTED);
         time.setAlignmentX(own ? RIGHT_ALIGNMENT : LEFT_ALIGNMENT);
-        bubble.add(time);
-        row.add(bubble);
+        JPanel stack = new JPanel();
+        stack.setOpaque(false);
+        stack.setLayout(new BoxLayout(stack, BoxLayout.Y_AXIS));
+        bubble.setAlignmentX(own ? RIGHT_ALIGNMENT : LEFT_ALIGNMENT);
+        stack.add(bubble);
+        stack.add(Box.createVerticalStrut(4));
+        stack.add(time);
+        row.add(stack);
         return row;
+    }
+
+    private static JPanel attachmentCard(MessageAttachment attachment) {
+        JPanel card = new JPanel(new BorderLayout(9, 0));
+        card.setOpaque(false);
+        card.setPreferredSize(new Dimension(200, 43));
+        JLabel icon = new JLabel("▤", SwingConstants.CENTER);
+        icon.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 20));
+        icon.setForeground(BLUE);
+        icon.setOpaque(true);
+        icon.setBackground(ChatTheme.TEAL_PALE);
+        icon.setPreferredSize(new Dimension(37, 37));
+        card.add(icon, BorderLayout.WEST);
+        JPanel details = new JPanel();
+        details.setOpaque(false);
+        details.setLayout(new BoxLayout(details, BoxLayout.Y_AXIS));
+        String fileName = attachment.fileName() == null || attachment.fileName().isBlank()
+                ? "Tệp đính kèm" : attachment.fileName();
+        JLabel name = new JLabel(fileName.length() > 27 ? fileName.substring(0, 26) + "…" : fileName);
+        name.setToolTipText(fileName);
+        name.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 10));
+        name.setForeground(INK);
+        String fileSize = attachment.fileSize() >= 1024 * 1024
+                ? String.format(java.util.Locale.ROOT, "%.1f MB", attachment.fileSize() / 1048576.0)
+                : Math.max(1, attachment.fileSize() / 1024) + " KB";
+        JLabel size = new JLabel("Tệp đính kèm · " + fileSize);
+        size.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 9));
+        size.setForeground(MUTED);
+        details.add(Box.createVerticalStrut(4));
+        details.add(name);
+        details.add(Box.createVerticalStrut(3));
+        details.add(size);
+        card.add(details, BorderLayout.CENTER);
+        return card;
     }
 
     private static int longestLineWidth(JTextArea area, String body) {
@@ -479,6 +587,10 @@ public final class ChatPanel extends JPanel {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setColor(color);
             g.fillRoundRect(0, 0, getWidth(), getHeight(), radius, radius);
+            if (ChatTheme.MILK.equals(color)) {
+                g.setColor(BORDER);
+                g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
+            }
             if (highlighted) {
                 g.setColor(new Color(242, 174, 39));
                 g.setStroke(new BasicStroke(2));
@@ -513,14 +625,15 @@ public final class ChatPanel extends JPanel {
         protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(isEnabled() ? BLUE : new Color(177, 197, 221));
+            g.setColor(isEnabled() ? SKY : new Color(159, 216, 203));
             g.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
             g.setColor(Color.WHITE);
             g.setStroke(new BasicStroke(2.4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             int mid = getHeight() / 2;
-            g.drawLine(15, mid, 30, mid);
-            g.drawLine(24, mid - 6, 30, mid);
-            g.drawLine(24, mid + 6, 30, mid);
+            int tip = getWidth() / 2 + 6;
+            g.drawLine(getWidth() / 2 - 6, mid, tip, mid);
+            g.drawLine(tip - 5, mid - 5, tip, mid);
+            g.drawLine(tip - 5, mid + 5, tip, mid);
             g.dispose();
         }
     }
@@ -537,12 +650,10 @@ public final class ChatPanel extends JPanel {
         protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(new Color(245, 248, 252));
-            g.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
-            g.setColor(MUTED);
-            g.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.drawOval(11, 10, 12, 12);
-            g.drawLine(22, 21, 28, 28);
+            g.setColor(INK);
+            g.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g.drawOval(7, 7, 9, 9);
+            g.drawLine(15, 15, 20, 20);
             g.dispose();
         }
     }

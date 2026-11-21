@@ -16,9 +16,9 @@ import java.awt.Font;
 
 /** A reviewable AI reply suggestion. Only the user can insert it into the draft. */
 public final class LlmSuggestionPanel extends JPanel {
-    private static final Color INK = new Color(30, 48, 72);
-    private static final Color MUTED = new Color(113, 132, 157);
-    private static final Color BORDER = new Color(220, 232, 244);
+    private static final Color INK = ChatTheme.INK;
+    private static final Color MUTED = ChatTheme.MUTED;
+    private static final Color BORDER = ChatTheme.BORDER;
     private final JLabel status = new JLabel();
     private final JTextArea suggestion = new JTextArea(3, 24);
     private final JButton generate = new JButton("Tạo gợi ý");
@@ -30,7 +30,7 @@ public final class LlmSuggestionPanel extends JPanel {
 
     public LlmSuggestionPanel() {
         super(new BorderLayout(0, 10));
-        setBackground(new Color(247, 250, 255));
+        setBackground(new Color(244, 247, 251));
         setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER),
                 BorderFactory.createEmptyBorder(14, 20, 14, 20)));

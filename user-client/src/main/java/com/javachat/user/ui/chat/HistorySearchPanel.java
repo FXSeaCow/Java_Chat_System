@@ -32,10 +32,10 @@ import java.util.function.LongConsumer;
 
 /** Searches messages already loaded for the active conversation. */
 final class HistorySearchPanel extends JPanel {
-    private static final Color INK = new Color(30, 48, 72);
-    private static final Color MUTED = new Color(113, 132, 157);
-    private static final Color BLUE = new Color(45, 112, 220);
-    private static final Color BORDER = new Color(220, 232, 244);
+    private static final Color INK = ChatTheme.INK;
+    private static final Color MUTED = ChatTheme.MUTED;
+    private static final Color BLUE = ChatTheme.TEAL;
+    private static final Color BORDER = ChatTheme.BORDER;
     private static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("dd/MM/yyyy · HH:mm");
 
     private final JTextField query = new JTextField();

@@ -1,71 +1,56 @@
 -- Java Chat System - Sample data
--- Target: MySQL 8.0.16+
+-- Target: PostgreSQL / Supabase
 -- Run database/schema.sql before this file.
+-- Run only on an empty database; this file inserts fixed demo IDs.
 -- Demo password for every account: password
 
-SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
-
-DELETE FROM ai_requests;
-DELETE FROM reports;
-DELETE FROM message_reads;
-DELETE FROM message_attachments;
-DELETE FROM messages;
-DELETE FROM group_details;
-DELETE FROM conversation_members;
-DELETE FROM conversations;
-DELETE FROM friendships;
-DELETE FROM auth_sessions;
-DELETE FROM users;
-
-ALTER TABLE ai_requests AUTO_INCREMENT = 1;
-ALTER TABLE reports AUTO_INCREMENT = 1;
-ALTER TABLE message_attachments AUTO_INCREMENT = 1;
-ALTER TABLE messages AUTO_INCREMENT = 1;
-ALTER TABLE conversations AUTO_INCREMENT = 1;
-ALTER TABLE friendships AUTO_INCREMENT = 1;
-ALTER TABLE auth_sessions AUTO_INCREMENT = 1;
-ALTER TABLE users AUTO_INCREMENT = 1;
-
-SET FOREIGN_KEY_CHECKS = 1;
-
-START TRANSACTION;
+BEGIN;
+SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';
 
 INSERT INTO users (
     id, username, email, password_hash, display_name, avatar_url,
+    address, date_of_birth, gender,
     role, status, created_at, updated_at
 ) VALUES
     (1, 'an.nguyen', 'an.nguyen@example.com',
      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
      'Nguyễn Hoài An', 'https://i.pravatar.cc/300?img=1',
+     '227 Nguyễn Văn Cừ, Quận 5, TP.HCM', '2004-03-12', 'FEMALE',
      'USER', 'ACTIVE', '2026-10-01 08:00:00.000', '2026-11-05 08:00:00.000'),
     (2, 'bao.tran', 'bao.tran@example.com',
      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
      'Trần Gia Bảo', 'https://i.pravatar.cc/300?img=3',
+     '12 Lê Lợi, Quận 1, TP.HCM', '2004-07-25', 'MALE',
      'USER', 'ACTIVE', '2026-10-02 09:15:00.000', '2026-11-05 08:05:00.000'),
     (3, 'chi.le', 'chi.le@example.com',
      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
      'Lê Minh Chi', 'https://i.pravatar.cc/300?img=5',
+     '45 Trần Hưng Đạo, Ninh Kiều, Cần Thơ', '2003-11-02', 'FEMALE',
      'USER', 'ACTIVE', '2026-10-03 10:30:00.000', '2026-11-05 08:10:00.000'),
     (4, 'dung.pham', 'dung.pham@example.com',
      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
      'Phạm Anh Dũng', 'https://i.pravatar.cc/300?img=7',
+     '8 Hùng Vương, Hải Châu, Đà Nẵng', '2004-01-30', 'MALE',
      'USER', 'ACTIVE', '2026-10-04 13:00:00.000', '2026-11-04 21:00:00.000'),
     (5, 'ha.vo', 'ha.vo@example.com',
      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
      'Võ Thanh Hà', 'https://i.pravatar.cc/300?img=9',
+     '102 Cách Mạng Tháng 8, Quận 3, TP.HCM', '2005-05-18', 'FEMALE',
      'USER', 'BLOCKED', '2026-10-05 14:20:00.000', '2026-11-04 22:00:00.000'),
     (6, 'khanh.do', 'khanh.do@example.com',
      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
      'Đỗ Minh Khánh', NULL,
+     '33 Kim Mã, Ba Đình, Hà Nội', '2004-09-09', 'OTHER',
      'USER', 'ACTIVE', '2026-10-06 15:45:00.000', '2026-11-05 07:55:00.000'),
     (7, 'admin.linh', 'admin.linh@example.com',
      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
      'Quản trị viên Linh', NULL,
+     '227 Nguyễn Văn Cừ, Quận 5, TP.HCM', '1995-04-20', 'FEMALE',
      'ADMIN', 'ACTIVE', '2026-09-01 08:00:00.000', '2026-11-05 07:30:00.000'),
     (8, 'admin.nam', 'admin.nam@example.com',
      '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy',
      'Quản trị viên Nam', NULL,
+     '227 Nguyễn Văn Cừ, Quận 5, TP.HCM', '1993-12-01', 'MALE',
      'ADMIN', 'ACTIVE', '2026-09-01 08:05:00.000', '2026-11-05 07:35:00.000');
 
 INSERT INTO auth_sessions (
@@ -211,5 +196,15 @@ INSERT INTO ai_requests (
      'Tạo ví dụ truy vấn lấy 20 tin nhắn mới nhất.',
      NULL,
      'demo-chat-model', 17, 0, 'FAILED', '2026-11-05 08:29:00.000');
+
+-- Explicit demo IDs do not advance PostgreSQL identity sequences.
+SELECT setval(pg_get_serial_sequence('public.users', 'id'), (SELECT MAX(id) FROM public.users));
+SELECT setval(pg_get_serial_sequence('public.auth_sessions', 'id'), (SELECT MAX(id) FROM public.auth_sessions));
+SELECT setval(pg_get_serial_sequence('public.friendships', 'id'), (SELECT MAX(id) FROM public.friendships));
+SELECT setval(pg_get_serial_sequence('public.conversations', 'id'), (SELECT MAX(id) FROM public.conversations));
+SELECT setval(pg_get_serial_sequence('public.messages', 'id'), (SELECT MAX(id) FROM public.messages));
+SELECT setval(pg_get_serial_sequence('public.message_attachments', 'id'), (SELECT MAX(id) FROM public.message_attachments));
+SELECT setval(pg_get_serial_sequence('public.reports', 'id'), (SELECT MAX(id) FROM public.reports));
+SELECT setval(pg_get_serial_sequence('public.ai_requests', 'id'), (SELECT MAX(id) FROM public.ai_requests));
 
 COMMIT;

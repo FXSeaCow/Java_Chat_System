@@ -40,6 +40,9 @@ erDiagram
         varchar password_hash
         varchar display_name
         varchar avatar_url
+        varchar address
+        date date_of_birth
+        varchar gender "MALE FEMALE OTHER"
         varchar role "USER hoặc ADMIN"
         varchar status "ACTIVE BLOCKED DELETED"
         datetime created_at
@@ -148,6 +151,9 @@ erDiagram
 ## Quy tắc và ràng buộc chính
 
 - `USERS.username` và `USERS.email` là duy nhất.
+- Thông tin người dùng theo đề gồm tên đăng nhập (`username`), họ tên
+  (`display_name`), địa chỉ (`address`), ngày sinh (`date_of_birth`), giới tính
+  (`gender`) và email.
 - Một cặp người dùng chỉ có một bản ghi trong `FRIENDSHIPS`; hai người không
   được trùng nhau trong cùng một quan hệ.
 - `CONVERSATIONS.type` phân biệt chat cá nhân (`DIRECT`) và chat nhóm (`GROUP`).

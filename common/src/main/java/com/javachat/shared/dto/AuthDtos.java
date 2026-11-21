@@ -1,9 +1,11 @@
 package com.javachat.shared.dto;
 
+import com.javachat.shared.model.Gender;
 import com.javachat.shared.model.PresenceStatus;
 import com.javachat.shared.model.User;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 public final class AuthDtos {
     private AuthDtos() {
@@ -13,11 +15,16 @@ public final class AuthDtos {
             String username,
             String email,
             String password,
-            String displayName) {
+            String displayName,
+            String address,
+            LocalDate dateOfBirth,
+            Gender gender) {
         @Override
         public String toString() {
             return "RegisterRequest[username=" + username + ", email=" + email
-                    + ", password=<redacted>, displayName=" + displayName + "]";
+                    + ", password=<redacted>, displayName=" + displayName
+                    + ", address=" + address + ", dateOfBirth=" + dateOfBirth
+                    + ", gender=" + gender + "]";
         }
     }
 
@@ -35,7 +42,12 @@ public final class AuthDtos {
     public record ProfileGetRequest(long userId) {
     }
 
-    public record ProfileUpdateRequest(String displayName, String avatarUrl) {
+    public record ProfileUpdateRequest(
+            String displayName,
+            String avatarUrl,
+            String address,
+            LocalDate dateOfBirth,
+            Gender gender) {
     }
 
     public record SessionExpiredEvent(String reason) {

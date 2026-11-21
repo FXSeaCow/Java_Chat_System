@@ -12,6 +12,8 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JPopupMenu;
+import javax.swing.JMenuItem;
 import javax.swing.JTextField;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
@@ -28,6 +30,8 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -40,11 +44,11 @@ import java.util.function.Consumer;
 
 /** Searchable conversation navigation backed by the shared protocol DTO. */
 public final class ConversationListPanel extends JPanel {
-    private static final Color INK = new Color(30, 48, 72);
-    private static final Color MUTED = new Color(113, 132, 157);
-    private static final Color BLUE = new Color(45, 112, 220);
-    private static final Color PALE_BLUE = new Color(231, 241, 253);
-    private static final Color BORDER = new Color(226, 235, 245);
+    private static final Color INK = ChatTheme.INK;
+    private static final Color MUTED = ChatTheme.MUTED;
+    private static final Color BLUE = ChatTheme.TEAL;
+    private static final Color PALE_BLUE = ChatTheme.TEAL_PALE;
+    private static final Color BORDER = ChatTheme.BORDER;
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM");
 
@@ -62,80 +66,114 @@ public final class ConversationListPanel extends JPanel {
             g.setColor(MUTED);
             g.setFont(getFont());
             var metrics = g.getFontMetrics();
-            g.drawString("Tìm hội thoại", 0, (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
+            g.drawString("Search conversations", getInsets().left,
+                    (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
             g.dispose();
         }
     };
     private final PillButton allButton = new PillButton("Tất cả");
     private final PillButton unreadButton = new PillButton("Chưa đọc");
+    private final JButton actionsButton = new RoundedActionButton();
     private final JLabel empty = new JLabel("Chưa có hội thoại", SwingConstants.CENTER);
     private final JPanel center = new JPanel(new BorderLayout());
     private boolean unreadOnly;
     private Consumer<ConversationSummary> selectionListener = ignored -> { };
+    private Runnable findPeopleListener = () -> { };
+    private Runnable createGroupListener = () -> { };
+    private Runnable manageGroupListener = () -> { };
 
     public ConversationListPanel() {
         super(new BorderLayout());
-        setBackground(Color.WHITE);
-        setPreferredSize(new Dimension(350, 600));
+        setBackground(ChatTheme.MILK);
+        setPreferredSize(new Dimension(300, 600));
         setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, BORDER));
 
         JPanel top = new JPanel();
-        top.setBackground(Color.WHITE);
+        top.setBackground(ChatTheme.MILK);
         top.setLayout(new BoxLayout(top, BoxLayout.Y_AXIS));
-        top.setBorder(BorderFactory.createEmptyBorder(24, 22, 14, 22));
+        top.setBorder(BorderFactory.createEmptyBorder(24, 20, 10, 20));
 
-        JLabel brand = new JLabel("●  JAVA CHAT");
-        brand.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 12));
-        brand.setForeground(BLUE);
-        brand.setAlignmentX(LEFT_ALIGNMENT);
-        top.add(brand);
-        top.add(Box.createVerticalStrut(21));
-
-        JLabel heading = new JLabel("Tin nhắn");
-        heading.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 25));
+        JLabel heading = new JLabel("Messages");
+        heading.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
         heading.setForeground(INK);
-        heading.setAlignmentX(LEFT_ALIGNMENT);
-        top.add(heading);
+        JPanel headingRow = new JPanel(new BorderLayout());
+        headingRow.setOpaque(false);
+        headingRow.setAlignmentX(LEFT_ALIGNMENT);
+        headingRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        headingRow.add(heading, BorderLayout.WEST);
+        actionsButton.setText("+");
+        actionsButton.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 19));
+        actionsButton.setForeground(Color.WHITE);
+        actionsButton.setBackground(BLUE);
+        actionsButton.setFocusPainted(false);
+        actionsButton.setToolTipText("Mở các chức năng khác");
+        actionsButton.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        actionsButton.setPreferredSize(new Dimension(36, 36));
+        actionsButton.setBorder(BorderFactory.createEmptyBorder());
+        JPopupMenu actions = new JPopupMenu();
+        JMenuItem findPeople = new JMenuItem("Tìm người");
+        JMenuItem createGroup = new JMenuItem("Tạo nhóm chat");
+        JMenuItem manageGroup = new JMenuItem("Quản lý nhóm chat");
+        findPeople.addActionListener(event -> findPeopleListener.run());
+        createGroup.addActionListener(event -> createGroupListener.run());
+        manageGroup.addActionListener(event -> manageGroupListener.run());
+        actions.add(findPeople);
+        actions.add(createGroup);
+        actions.add(manageGroup);
+        actionsButton.addActionListener(event -> actions.show(actionsButton, 0, actionsButton.getHeight()));
+        headingRow.add(actionsButton, BorderLayout.EAST);
+        top.add(headingRow);
         top.add(Box.createVerticalStrut(18));
 
-        JPanel searchBox = new RoundedPanel(new Color(245, 248, 252), 14);
+        JPanel searchBox = new RoundedPanel(new Color(235, 245, 236), 18);
         searchBox.setLayout(new BorderLayout(10, 0));
         searchBox.setBorder(BorderFactory.createEmptyBorder(0, 13, 0, 13));
         searchBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
-        searchBox.setPreferredSize(new Dimension(300, 42));
+        searchBox.setPreferredSize(new Dimension(260, 42));
         searchBox.setAlignmentX(LEFT_ALIGNMENT);
         searchBox.add(new SearchGlyph(), BorderLayout.WEST);
-        search.setBorder(null);
+        search.setBorder(BorderFactory.createEmptyBorder(0, 4, 0, 0));
         search.setOpaque(false);
-        search.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
+        search.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
         search.setForeground(INK);
-        search.putClientProperty("JTextField.placeholderText", "Tìm hội thoại");
         search.setToolTipText("Tìm theo tên hoặc nội dung tin nhắn");
+        search.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent event) {
+                search.repaint();
+            }
+
+            @Override
+            public void focusLost(FocusEvent event) {
+                search.repaint();
+            }
+        });
         searchBox.add(search, BorderLayout.CENTER);
         top.add(searchBox);
-        top.add(Box.createVerticalStrut(16));
-
-        JPanel filters = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        filters.setOpaque(false);
-        filters.setAlignmentX(LEFT_ALIGNMENT);
-        filters.add(allButton);
-        filters.add(unreadButton);
-        top.add(filters);
-        top.add(Box.createVerticalStrut(6));
+        top.add(Box.createVerticalStrut(15));
+        JLabel recent = new JLabel("RECENT");
+        recent.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 11));
+        recent.setForeground(MUTED);
+        recent.setAlignmentX(LEFT_ALIGNMENT);
+        top.add(recent);
+        top.add(Box.createVerticalStrut(5));
+        JMenuItem toggleUnread = new JMenuItem("Chỉ chưa đọc");
+        toggleUnread.addActionListener(event -> { unreadOnly = !unreadOnly; refresh(); });
+        actions.add(toggleUnread);
         add(top, BorderLayout.NORTH);
 
-        list.setBackground(Color.WHITE);
+        list.setBackground(ChatTheme.MILK);
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setCellRenderer(new ConversationRenderer());
-        list.setFixedCellHeight(82);
-        list.setBorder(BorderFactory.createEmptyBorder(2, 10, 8, 10));
+        list.setFixedCellHeight(68);
+        list.setBorder(BorderFactory.createEmptyBorder(2, 8, 8, 8));
         list.addListSelectionListener(event -> {
             if (!event.getValueIsAdjusting()) selectionListener.accept(list.getSelectedValue());
         });
         scroll.setBorder(null);
-        scroll.getViewport().setBackground(Color.WHITE);
+        scroll.getViewport().setBackground(ChatTheme.MILK);
         scroll.getVerticalScrollBar().setUnitIncrement(16);
-        center.setBackground(Color.WHITE);
+        center.setBackground(ChatTheme.MILK);
         center.add(scroll, BorderLayout.CENTER);
         add(center, BorderLayout.CENTER);
 
@@ -153,6 +191,33 @@ public final class ConversationListPanel extends JPanel {
 
     public void setSelectionListener(Consumer<ConversationSummary> listener) {
         selectionListener = listener == null ? ignored -> { } : listener;
+    }
+
+    public void selectConversation(long conversationId) {
+        for (int i = 0; i < model.size(); i++) {
+            if (model.get(i).conversation().id() == conversationId) {
+                if (list.getSelectedIndex() == i) selectionListener.accept(model.get(i));
+                else list.setSelectedIndex(i);
+                list.ensureIndexIsVisible(i);
+                return;
+            }
+        }
+    }
+
+    public void setFindPeopleListener(Runnable listener) {
+        findPeopleListener = listener == null ? () -> { } : listener;
+    }
+
+    public void setCreateGroupListener(Runnable listener) {
+        createGroupListener = listener == null ? () -> { } : listener;
+    }
+
+    public void setManageGroupListener(Runnable listener) {
+        manageGroupListener = listener == null ? () -> { } : listener;
+    }
+
+    public void clearSelection() {
+        list.clearSelection();
     }
 
     /** Call on the Swing event dispatch thread after receiving a list response. */
@@ -218,13 +283,27 @@ public final class ConversationListPanel extends JPanel {
         return local.toLocalDate().equals(LocalDate.now()) ? TIME.format(local) : DATE.format(local);
     }
 
+    private static Color avatarColor(String title, boolean group) {
+        if (group) return new Color(193, 166, 122);
+        char first = Character.toUpperCase(title.strip().charAt(0));
+        return switch (first) {
+            case 'A', 'N' -> new Color(60, 171, 161);
+            case 'M' -> new Color(204, 169, 121);
+            case 'T' -> new Color(92, 176, 164);
+            case 'H' -> new Color(116, 172, 165);
+            default -> new Color(75, 162, 153);
+        };
+    }
+
     /** Compact initials avatar shared with the chat header. */
     static final class Avatar extends JPanel {
         private final String initials;
         private final boolean group;
+        private final Color color;
 
         Avatar(String title, boolean group, int size) {
             this.group = group;
+            this.color = avatarColor(title, group);
             String[] words = title.strip().split("\\s+");
             initials = group ? "#" : words.length > 1
                     ? (words[0].substring(0, 1) + words[words.length - 1].substring(0, 1)).toUpperCase(Locale.ROOT)
@@ -238,11 +317,11 @@ public final class ConversationListPanel extends JPanel {
             super.paintComponent(graphics);
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(group ? new Color(232, 225, 251) : new Color(219, 234, 252));
+            g.setColor(color);
             int size = Math.min(getWidth(), getHeight());
             g.fillOval(0, 0, size, size);
-            g.setColor(group ? new Color(111, 78, 181) : BLUE);
-            g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, group ? 21 : 15));
+            g.setColor(Color.WHITE);
+            g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, Math.max(11, size / 3)));
             var metrics = g.getFontMetrics();
             g.drawString(initials, (size - metrics.stringWidth(initials)) / 2,
                     (size - metrics.getHeight()) / 2 + metrics.getAscent());
@@ -271,15 +350,15 @@ public final class ConversationListPanel extends JPanel {
         ConversationRenderer() {
             super(new BorderLayout(12, 0));
             setOpaque(false);
-            setBorder(BorderFactory.createEmptyBorder(11, 12, 11, 12));
+            setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
             avatarSlot.setOpaque(false);
-            avatarSlot.setPreferredSize(new Dimension(46, 46));
+            avatarSlot.setPreferredSize(new Dimension(40, 40));
             add(avatarSlot, BorderLayout.WEST);
             JPanel texts = new JPanel(new BorderLayout(0, 5));
             texts.setOpaque(false);
-            name.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
+            name.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 13));
             name.setForeground(INK);
-            snippet.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
+            snippet.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
             snippet.setForeground(MUTED);
             texts.add(name, BorderLayout.NORTH);
             texts.add(snippet, BorderLayout.CENTER);
@@ -287,7 +366,7 @@ public final class ConversationListPanel extends JPanel {
             JPanel meta = new JPanel();
             meta.setOpaque(false);
             meta.setLayout(new BoxLayout(meta, BoxLayout.Y_AXIS));
-            timestamp.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+            timestamp.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 10));
             timestamp.setForeground(MUTED);
             timestamp.setAlignmentX(RIGHT_ALIGNMENT);
             badge.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 11));
@@ -310,7 +389,7 @@ public final class ConversationListPanel extends JPanel {
             snippet.setText(clip(preview(item), 29));
             timestamp.setText(time(item));
             avatarSlot.removeAll();
-            avatarSlot.add(new Avatar(title, item.conversation().type() == ConversationType.GROUP, 46),
+            avatarSlot.add(new Avatar(title, item.conversation().type() == ConversationType.GROUP, 40),
                     BorderLayout.CENTER);
             int unread = Math.max(0, item.unreadCount());
             badge.setText(unread > 99 ? "99+" : Integer.toString(unread));
@@ -323,7 +402,7 @@ public final class ConversationListPanel extends JPanel {
         protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(selected ? PALE_BLUE : Color.WHITE);
+            g.setColor(selected ? PALE_BLUE : ChatTheme.MILK);
             g.fillRoundRect(0, 2, getWidth(), getHeight() - 4, 18, 18);
             g.dispose();
             super.paintComponent(graphics);
@@ -355,6 +434,22 @@ public final class ConversationListPanel extends JPanel {
         }
     }
 
+    private static final class RoundedActionButton extends JButton {
+        RoundedActionButton() {
+            setContentAreaFilled(false);
+            setOpaque(false);
+        }
+
+        @Override protected void paintComponent(Graphics graphics) {
+            Graphics2D g = (Graphics2D) graphics.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(getModel().isRollover() ? ChatTheme.TEAL_DARK : ChatTheme.TEAL);
+            g.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
+            g.dispose();
+            super.paintComponent(graphics);
+        }
+    }
+
     private static final class SearchGlyph extends JPanel {
         SearchGlyph() {
             setOpaque(false);
@@ -368,8 +463,9 @@ public final class ConversationListPanel extends JPanel {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setColor(MUTED);
             g.setStroke(new BasicStroke(2, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g.drawOval(2, 2, 10, 10);
-            g.drawLine(11, 11, 17, 17);
+            int y = (getHeight() - 19) / 2;
+            g.drawOval(2, y + 1, 10, 10);
+            g.drawLine(11, y + 10, 17, y + 16);
             g.dispose();
         }
     }
@@ -389,7 +485,7 @@ public final class ConversationListPanel extends JPanel {
 
         void setActive(boolean active) {
             this.active = active;
-            setForeground(active ? BLUE : MUTED);
+            setForeground(active ? Color.WHITE : MUTED);
             repaint();
         }
 
@@ -397,7 +493,7 @@ public final class ConversationListPanel extends JPanel {
         protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(active ? PALE_BLUE : new Color(246, 248, 251));
+            g.setColor(active ? BLUE : Color.WHITE);
             g.fillRoundRect(0, 0, getWidth(), getHeight(), 18, 18);
             g.dispose();
             super.paintComponent(graphics);
