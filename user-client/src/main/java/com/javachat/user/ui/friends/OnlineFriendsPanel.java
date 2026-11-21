@@ -1,5 +1,7 @@
 package com.javachat.user.ui.friends;
 
+import com.javachat.user.ui.chat.ChatTheme;
+
 import com.javachat.shared.dto.AuthDtos.PresenceChangedEvent;
 import com.javachat.shared.dto.FriendDtos.FriendListResponse;
 import com.javachat.shared.model.PresenceStatus;
@@ -39,11 +41,11 @@ import java.util.function.Consumer;
 
 /** Friends who are currently online, kept up to date by USER_PRESENCE_CHANGED_EVENT. */
 public final class OnlineFriendsPanel extends JPanel {
-    private static final Color INK = new Color(30, 48, 72);
-    private static final Color MUTED = new Color(113, 132, 157);
-    private static final Color BLUE = new Color(45, 112, 220);
+    private static final Color INK = ChatTheme.INK;
+    private static final Color MUTED = ChatTheme.MUTED;
+    private static final Color BLUE = ChatTheme.TEAL;
     private static final Color GREEN = new Color(46, 175, 98);
-    private static final Color CANVAS = new Color(238, 245, 252);
+    private static final Color CANVAS = ChatTheme.CREAM;
 
     private final List<User> friends = new ArrayList<>();
     /** Time each online user came online; absence means offline. */
@@ -248,7 +250,7 @@ public final class OnlineFriendsPanel extends JPanel {
         protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(selected ? new Color(231, 241, 253) : Color.WHITE);
+            g.setColor(selected ? new Color(237, 247, 255) : Color.WHITE);
             g.fillRoundRect(0, 2, getWidth(), getHeight() - 4, 14, 14);
             g.dispose();
             super.paintComponent(graphics);

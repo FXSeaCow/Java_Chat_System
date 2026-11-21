@@ -1,5 +1,7 @@
 package com.javachat.user.ui.groups;
 
+import com.javachat.user.ui.chat.ChatTheme;
+
 import com.javachat.shared.dto.GroupDtos.GroupUpdateRequest;
 import com.javachat.shared.dto.GroupDtos.MemberRemoveRequest;
 import com.javachat.shared.dto.GroupDtos.MemberRoleUpdateRequest;
@@ -17,10 +19,10 @@ import java.util.function.Consumer;
 
 /** Group settings and member administration screen for JC-35. */
 public final class GroupManagementPanel extends JPanel {
-    private static final Color INK = new Color(30, 48, 72);
-    private static final Color MUTED = new Color(113, 132, 157);
-    private static final Color BLUE = new Color(45, 112, 220);
-    private static final Color BORDER = new Color(220, 231, 243);
+    private static final Color INK = ChatTheme.INK;
+    private static final Color MUTED = ChatTheme.MUTED;
+    private static final Color BLUE = ChatTheme.TEAL;
+    private static final Color BORDER = ChatTheme.BORDER;
     private final JComboBox<GroupDetails> groups = new JComboBox<>();
     private final JTextField name = new JTextField();
     private final JTextArea description = new JTextArea(2, 20);
@@ -34,15 +36,18 @@ public final class GroupManagementPanel extends JPanel {
 
     public GroupManagementPanel() {
         super(new BorderLayout());
-        setBackground(new Color(238, 245, 252));
-        setBorder(BorderFactory.createEmptyBorder(30, 46, 30, 46));
+        setBackground(ChatTheme.CREAM);
+        setBorder(BorderFactory.createEmptyBorder(24, 28, 24, 28));
         JPanel card = new JPanel(new BorderLayout(0, 18));
-        card.setBackground(Color.WHITE);
+        card.setBackground(ChatTheme.MILK);
         card.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER),
-                BorderFactory.createEmptyBorder(26, 32, 26, 32)));
-        JPanel header = new JPanel(new BorderLayout(16, 0)); header.setOpaque(false);
-        JLabel title = new JLabel("Quản lý nhóm chat"); title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 25)); title.setForeground(INK);
+                BorderFactory.createEmptyBorder(24, 26, 24, 26)));
+        JPanel header = new JPanel(); header.setOpaque(false); header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+        JLabel title = new JLabel("Quản lý nhóm chat"); title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 24)); title.setForeground(INK);
+        title.setAlignmentX(LEFT_ALIGNMENT);
         groups.setPreferredSize(new Dimension(230, 38));
+        groups.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
+        groups.setAlignmentX(LEFT_ALIGNMENT);
         groups.setRenderer(new DefaultListCellRenderer() {
             public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean selected, boolean focus) {
                 JLabel label = (JLabel) super.getListCellRendererComponent(list, value, index, selected, focus);
@@ -50,7 +55,9 @@ public final class GroupManagementPanel extends JPanel {
             }
         });
         groups.addActionListener(event -> selectGroup());
-        header.add(title, BorderLayout.WEST); header.add(groups, BorderLayout.EAST);
+        header.add(title);
+        header.add(Box.createVerticalStrut(14));
+        header.add(groups);
         card.add(header, BorderLayout.NORTH);
 
         JPanel body = new JPanel(); body.setOpaque(false); body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
@@ -65,7 +72,7 @@ public final class GroupManagementPanel extends JPanel {
         save.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 13)); save.setFocusPainted(false);
         save.setAlignmentX(LEFT_ALIGNMENT); save.addActionListener(event -> save()); body.add(save);
         body.add(Box.createVerticalStrut(20)); label(body, "Thành viên");
-        memberList.setLayout(new BoxLayout(memberList, BoxLayout.Y_AXIS)); memberList.setBackground(Color.WHITE);
+        memberList.setLayout(new BoxLayout(memberList, BoxLayout.Y_AXIS)); memberList.setBackground(ChatTheme.MILK);
         JScrollPane memberScroll = new JScrollPane(memberList); memberScroll.setBorder(BorderFactory.createLineBorder(BORDER));
         memberScroll.setMaximumSize(new Dimension(Integer.MAX_VALUE, 260)); memberScroll.setPreferredSize(new Dimension(500, 230));
         body.add(memberScroll); card.add(body, BorderLayout.CENTER); add(card, BorderLayout.CENTER);
@@ -100,11 +107,11 @@ public final class GroupManagementPanel extends JPanel {
             User user = users.get(member.userId());
             String display = user == null ? "Người dùng " + member.userId()
                     : user.displayName() == null || user.displayName().isBlank() ? user.username() : user.displayName();
-            JPanel row = new JPanel(new BorderLayout(10, 0)); row.setBackground(Color.WHITE);
+            JPanel row = new JPanel(new BorderLayout(10, 5)); row.setBackground(ChatTheme.MILK);
             row.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER),
                     BorderFactory.createEmptyBorder(9, 12, 9, 12)));
             JLabel person = new JLabel("<html><b>" + display + "</b><br><font color='#71849D'>ID " + member.userId() + "</font></html>");
-            row.add(person, BorderLayout.CENTER);
+            row.add(person, BorderLayout.NORTH);
             JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 7, 0)); actions.setOpaque(false);
             JComboBox<MemberRole> role = new JComboBox<>(MemberRole.values()); role.setSelectedItem(member.role());
             role.setEnabled(member.role() != MemberRole.OWNER);
@@ -114,7 +121,7 @@ public final class GroupManagementPanel extends JPanel {
             });
             JButton remove = new JButton("Xóa"); remove.setForeground(new Color(190, 55, 55)); remove.setEnabled(member.role() != MemberRole.OWNER);
             remove.addActionListener(event -> removeListener.accept(new MemberRemoveRequest(member.conversationId(), member.userId())));
-            actions.add(role); actions.add(remove); row.add(actions, BorderLayout.EAST); memberList.add(row);
+            actions.add(role); actions.add(remove); row.add(actions, BorderLayout.SOUTH); memberList.add(row);
         }
         memberList.revalidate(); memberList.repaint();
     }

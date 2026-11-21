@@ -1,5 +1,7 @@
 package com.javachat.user.ui.groups;
 
+import com.javachat.user.ui.chat.ChatTheme;
+
 import com.javachat.shared.dto.GroupDtos.GroupCreateRequest;
 import com.javachat.shared.model.User;
 
@@ -11,10 +13,10 @@ import java.util.function.Consumer;
 
 /** Form for JC-34. Submits data through a callback and performs no network work. */
 public final class GroupCreatePanel extends JPanel {
-    private static final Color INK = new Color(30, 48, 72);
-    private static final Color MUTED = new Color(113, 132, 157);
-    private static final Color BLUE = new Color(45, 112, 220);
-    private static final Color BORDER = new Color(220, 231, 243);
+    private static final Color INK = ChatTheme.INK;
+    private static final Color MUTED = ChatTheme.MUTED;
+    private static final Color BLUE = ChatTheme.TEAL;
+    private static final Color BORDER = ChatTheme.BORDER;
     private final JTextField name = field();
     private final JTextArea description = new JTextArea(3, 20);
     private final JPanel memberList = new JPanel();
@@ -24,7 +26,7 @@ public final class GroupCreatePanel extends JPanel {
 
     public GroupCreatePanel() {
         super(new BorderLayout());
-        setBackground(new Color(238, 245, 252));
+        setBackground(new Color(239, 240, 243));
         setBorder(BorderFactory.createEmptyBorder(34, 50, 34, 50));
         JPanel card = new JPanel(new BorderLayout(0, 20));
         card.setBackground(Color.WHITE);

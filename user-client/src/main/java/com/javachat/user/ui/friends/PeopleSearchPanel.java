@@ -1,5 +1,7 @@
 package com.javachat.user.ui.friends;
 
+import com.javachat.user.ui.chat.ChatTheme;
+
 import com.javachat.shared.dto.FriendDtos.SendRequest;
 import com.javachat.shared.model.User;
 
@@ -16,10 +18,10 @@ import java.util.function.Consumer;
 
 /** UI-only people finder. Network search and friend requests are supplied through callbacks. */
 public final class PeopleSearchPanel extends JPanel {
-    private static final Color INK = new Color(30, 48, 72);
-    private static final Color MUTED = new Color(113, 132, 157);
-    private static final Color BLUE = new Color(45, 112, 220);
-    private static final Color BORDER = new Color(220, 231, 243);
+    private static final Color INK = ChatTheme.INK;
+    private static final Color MUTED = ChatTheme.MUTED;
+    private static final Color BLUE = ChatTheme.TEAL;
+    private static final Color BORDER = ChatTheme.BORDER;
 
     private final List<User> people = new ArrayList<>();
     private final Set<Long> friends = new HashSet<>();
@@ -33,7 +35,7 @@ public final class PeopleSearchPanel extends JPanel {
 
     public PeopleSearchPanel() {
         super(new BorderLayout());
-        setBackground(new Color(238, 245, 252));
+        setBackground(new Color(239, 240, 243));
         setBorder(BorderFactory.createEmptyBorder(38, 54, 38, 54));
 
         JPanel content = new JPanel(new BorderLayout(0, 20));
@@ -203,7 +205,7 @@ public final class PeopleSearchPanel extends JPanel {
             action.setText(isFriend ? "Bạn bè" : isPending ? "Đã gửi lời mời" : "+ Kết bạn");
             action.setEnabled(!isFriend && !isPending);
             action.setForeground(isFriend || isPending ? MUTED : BLUE);
-            action.setBackground(isFriend || isPending ? new Color(242, 245, 248) : new Color(231, 241, 253));
+            action.setBackground(isFriend || isPending ? new Color(242, 245, 248) : new Color(237, 247, 255));
             action.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
             return this;
         }

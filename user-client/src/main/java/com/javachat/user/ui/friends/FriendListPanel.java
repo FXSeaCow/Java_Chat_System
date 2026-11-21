@@ -1,5 +1,7 @@
 package com.javachat.user.ui.friends;
 
+import com.javachat.user.ui.chat.ChatTheme;
+
 import com.javachat.shared.dto.FriendDtos.FriendListResponse;
 import com.javachat.shared.model.User;
 
@@ -36,10 +38,10 @@ import java.util.function.Consumer;
 
 /** Friend list view; data and actions are supplied by the application layer. */
 public final class FriendListPanel extends JPanel {
-    private static final Color INK = new Color(30, 48, 72);
-    private static final Color MUTED = new Color(113, 132, 157);
-    private static final Color BLUE = new Color(45, 112, 220);
-    private static final Color CANVAS = new Color(238, 245, 252);
+    private static final Color INK = ChatTheme.INK;
+    private static final Color MUTED = ChatTheme.MUTED;
+    private static final Color BLUE = ChatTheme.TEAL;
+    private static final Color CANVAS = ChatTheme.CREAM;
 
     private final List<User> friends = new ArrayList<>();
     private final DefaultListModel<User> model = new DefaultListModel<>();
@@ -90,7 +92,7 @@ public final class FriendListPanel extends JPanel {
         search.setAlignmentX(LEFT_ALIGNMENT);
         search.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
         search.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(220, 231, 243)),
+                BorderFactory.createLineBorder(new Color(232, 236, 242)),
                 BorderFactory.createEmptyBorder(8, 12, 8, 12)));
         search.putClientProperty("JTextField.placeholderText", "Tìm theo tên hoặc username");
         search.setToolTipText("Tìm theo tên hoặc username");
@@ -246,7 +248,7 @@ public final class FriendListPanel extends JPanel {
         protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(selected ? new Color(231, 241, 253) : Color.WHITE);
+            g.setColor(selected ? new Color(237, 247, 255) : Color.WHITE);
             g.fillRoundRect(0, 2, getWidth(), getHeight() - 4, 14, 14);
             g.dispose();
             super.paintComponent(graphics);

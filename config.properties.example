@@ -1,13 +1,19 @@
-# Copy this file to config.properties and set values for your local environment.
-# These keys are a starting convention; the application does not load them yet.
+# Copy to config.properties and fill in your Supabase connection details.
+# config.properties is ignored by Git. Never put credentials in the client.
 
 # TCP server and client connection
 server.host=127.0.0.1
 server.port=8080
+# Local development account (must exist in public.users).
+server.user_id=1
 
-# MySQL 8.0.16+; create the database before running database/schema.sql.
-database.url=jdbc:mysql://localhost:3306/java_chat
-database.username=java_chat
+# Supabase Dashboard > Connect > Direct connection or Session pooler.
+# Keep the JDBC prefix, host, port and database name. Use port 5432 for
+# Direct/Session mode. The pooler username is postgres.<project-ref>.
+# sslmode=require encrypts the connection. For certificate verification,
+# download the Supabase certificate and use sslmode=verify-full&sslrootcert=PATH.
+database.url=jdbc:postgresql://YOUR_HOST:5432/postgres?sslmode=require
+database.username=YOUR_DATABASE_USERNAME
 database.password=
 
 # Optional AI integration; leave blank until a provider is configured.

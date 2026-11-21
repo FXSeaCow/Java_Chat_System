@@ -1,5 +1,7 @@
 package com.javachat.user.ui.friends;
 
+import com.javachat.user.ui.chat.ChatTheme;
+
 import com.javachat.shared.dto.FriendDtos.FriendListResponse;
 import com.javachat.shared.dto.FriendDtos.FriendRequestDecision;
 import com.javachat.shared.dto.FriendDtos.RespondRequest;
@@ -36,10 +38,10 @@ import java.util.function.Consumer;
 
 /** Incoming and outgoing friend requests backed by FRIEND_LIST_RESPONSE. */
 public final class FriendRequestsPanel extends JPanel {
-    private static final Color INK = new Color(30, 48, 72);
-    private static final Color MUTED = new Color(113, 132, 157);
-    private static final Color BLUE = new Color(45, 112, 220);
-    private static final Color CANVAS = new Color(238, 245, 252);
+    private static final Color INK = ChatTheme.INK;
+    private static final Color MUTED = ChatTheme.MUTED;
+    private static final Color BLUE = ChatTheme.TEAL;
+    private static final Color CANVAS = ChatTheme.CREAM;
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final List<Friendship> incoming = new ArrayList<>();
@@ -246,7 +248,7 @@ public final class FriendRequestsPanel extends JPanel {
         protected void paintComponent(Graphics graphics) {
             Graphics2D g = (Graphics2D) graphics.create();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(selected ? new Color(231, 241, 253) : Color.WHITE);
+            g.setColor(selected ? new Color(237, 247, 255) : Color.WHITE);
             g.fillRoundRect(0, 2, getWidth(), getHeight() - 4, 14, 14);
             g.dispose();
             super.paintComponent(graphics);
