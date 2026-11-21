@@ -58,6 +58,8 @@ public final class LoginFrame extends JFrame {
     private static final Color ERROR = new Color(184, 40, 40);
     private static final Font BODY = new Font(Font.SANS_SERIF, Font.PLAIN, 15);
     private static final Font MEDIUM = new Font(Font.SANS_SERIF, Font.BOLD, 15);
+    private static final int AUTH_CARD_DEFAULT_HEIGHT = 330;
+    private static final int AUTH_CARD_FORGOT_HEIGHT = 230;
 
     private final Runnable onAuthenticated;
     private final JTextField loginField = new RoundedTextField("you@example.com");
@@ -73,6 +75,8 @@ public final class LoginFrame extends JFrame {
     private final JLabel registrationPasswordError = errorLabel();
     private final JLabel confirmPasswordError = errorLabel();
     private final JLabel termsError = errorLabel();
+    private final JTextField forgotEmailField = new RoundedTextField("you@example.com");
+    private final JLabel forgotEmailError = errorLabel();
     private final JCheckBox termsCheckBox = new JCheckBox("Tôi đồng ý với Điều khoản sử dụng");
     private final CardLayout authCardLayout = new CardLayout();
     private final JPanel authCards = new JPanel(authCardLayout);
@@ -81,7 +85,9 @@ public final class LoginFrame extends JFrame {
     private final PawModeSwitch modeSwitch = new PawModeSwitch();
     private final JLabel heading = new JLabel("Chào mừng trở lại!");
     private final JLabel subheading = new JLabel("Đăng nhập để tiếp tục trò chuyện cùng bạn bè.");
+    private Timer forgotPasswordTimer;
     private boolean signUpMode;
+    private boolean forgotPasswordMode;
 
     public LoginFrame(Runnable onAuthenticated) {
         super("Java Chat - Đăng nhập");
@@ -95,7 +101,7 @@ public final class LoginFrame extends JFrame {
         setLocationRelativeTo(null);
         setContentPane(buildContent());
         getRootPane().setDefaultButton(submitButton);
-        getRootPane().registerKeyboardAction(event -> dispose(),
+        getRootPane().registerKeyboardAction(event -> handleEscape(),
                 KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), JComponent.WHEN_IN_FOCUSED_WINDOW);
     }
 
@@ -147,10 +153,10 @@ public final class LoginFrame extends JFrame {
         form.add(Box.createVerticalStrut(12));
         authCards.setOpaque(false);
         authCards.setAlignmentX(LEFT_ALIGNMENT);
-        authCards.setMaximumSize(new Dimension(Integer.MAX_VALUE, 330));
-        authCards.setPreferredSize(new Dimension(420, 330));
+        setAuthCardHeight(AUTH_CARD_DEFAULT_HEIGHT);
         authCards.add(buildLoginCard(), "login");
         authCards.add(buildRegistrationCard(), "register");
+        authCards.add(buildForgotPasswordCard(), "forgot");
         form.add(authCards);
         form.add(Box.createVerticalStrut(11));
 
@@ -185,15 +191,7 @@ public final class LoginFrame extends JFrame {
         card.add(loginField);
         card.add(loginError);
 
-        JPanel passwordRow = new JPanel(new BorderLayout());
-        passwordRow.setOpaque(false);
-        passwordRow.setAlignmentX(LEFT_ALIGNMENT);
-        passwordRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
-        passwordRow.add(fieldLabel("Mật khẩu"), BorderLayout.WEST);
-        JButton forgot = linkButton("Quên mật khẩu?");
-        forgot.addActionListener(event -> setStatus("Liên kết đặt lại mật khẩu sẽ được gửi qua email.", false));
-        passwordRow.add(forgot, BorderLayout.EAST);
-        card.add(passwordRow);
+        card.add(fieldLabel("Mật khẩu"));
         card.add(Box.createVerticalStrut(5));
         configureField(passwordField, "Mật khẩu");
         card.add(passwordField);
@@ -203,7 +201,40 @@ public final class LoginFrame extends JFrame {
         char echo = passwordField.getEchoChar();
         showPassword.addActionListener(event -> passwordField.setEchoChar(
                 showPassword.isSelected() ? (char) 0 : echo));
-        card.add(showPassword);
+
+        JPanel passwordActions = new JPanel(new BorderLayout());
+        passwordActions.setOpaque(false);
+        passwordActions.setAlignmentX(LEFT_ALIGNMENT);
+        passwordActions.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+        passwordActions.add(showPassword, BorderLayout.WEST);
+        JButton forgot = linkButton("Quên mật khẩu?");
+        forgot.addActionListener(event -> showForgotPassword());
+        passwordActions.add(forgot, BorderLayout.EAST);
+        card.add(passwordActions);
+        return card;
+    }
+
+    private JPanel buildForgotPasswordCard() {
+        JPanel card = verticalCard();
+        JLabel guidance = new JLabel("<html>Nhập email đã đăng ký để nhận liên kết<br>tạo mật khẩu mới.</html>");
+        guidance.setFont(BODY);
+        guidance.setForeground(MUTED);
+        guidance.setAlignmentX(LEFT_ALIGNMENT);
+        guidance.setMaximumSize(new Dimension(Integer.MAX_VALUE, 48));
+        card.add(guidance);
+        card.add(Box.createVerticalStrut(20));
+        card.add(fieldLabel("Email đăng ký"));
+        card.add(Box.createVerticalStrut(8));
+        configureField(forgotEmailField, "Email khôi phục mật khẩu");
+        card.add(forgotEmailField);
+        card.add(forgotEmailError);
+        card.add(Box.createVerticalStrut(8));
+
+        JButton back = linkButton("Quay lại đăng nhập");
+        back.setAlignmentX(LEFT_ALIGNMENT);
+        back.setMaximumSize(new Dimension(180, 32));
+        back.addActionListener(event -> setMode(false));
+        card.add(back);
         return card;
     }
 
@@ -277,7 +308,14 @@ public final class LoginFrame extends JFrame {
         field.setMaximumSize(new Dimension(Integer.MAX_VALUE, 54));
         field.setPreferredSize(new Dimension(420, 54));
         field.setBorder(new EmptyBorder(0, 18, 0, 18));
+        field.setAlignmentX(LEFT_ALIGNMENT);
         field.getAccessibleContext().setAccessibleName(accessibleName);
+    }
+
+    private void setAuthCardHeight(int height) {
+        authCards.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
+        authCards.setPreferredSize(new Dimension(420, height));
+        authCards.revalidate();
     }
 
     private void configureCompactField(JTextField field, String accessibleName) {
@@ -294,30 +332,73 @@ public final class LoginFrame extends JFrame {
 
     private static void configureCheckBox(JCheckBox checkBox) {
         checkBox.setOpaque(false);
-        checkBox.setForeground(MUTED);
-        checkBox.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
-        checkBox.setFocusPainted(true);
+        checkBox.setForeground(INK);
+        checkBox.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 14));
+        checkBox.setIcon(new CheckBoxIcon(false));
+        checkBox.setSelectedIcon(new CheckBoxIcon(true));
+        checkBox.setDisabledIcon(new CheckBoxIcon(false, false));
+        checkBox.setDisabledSelectedIcon(new CheckBoxIcon(true, false));
+        checkBox.setIconTextGap(9);
+        checkBox.setFocusPainted(false);
+        checkBox.setBorderPainted(false);
         checkBox.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         checkBox.setAlignmentX(LEFT_ALIGNMENT);
-        checkBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+        checkBox.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
     }
 
     private void setMode(boolean signUp) {
+        cancelForgotPasswordRequest();
+        forgotPasswordMode = false;
         signUpMode = signUp;
+        setAuthCardHeight(AUTH_CARD_DEFAULT_HEIGHT);
+        setTitle(signUp ? "Java Chat - Đăng ký" : "Java Chat - Đăng nhập");
+        modeSwitch.setVisible(true);
         modeSwitch.setSignUp(signUp);
         heading.setText(signUp ? "Tạo tài khoản mới" : "Chào mừng trở lại!");
         subheading.setText(signUp
                 ? "Tham gia Java Chat và bắt đầu cuộc trò chuyện đầu tiên."
                 : "Đăng nhập để tiếp tục trò chuyện cùng bạn bè.");
         submitButton.setText(signUp ? "Tạo tài khoản" : "Đăng nhập");
+        submitButton.setEnabled(true);
         authCardLayout.show(authCards, signUp ? "register" : "login");
         clearErrors();
         javax.swing.SwingUtilities.invokeLater(() ->
                 (signUp ? fullNameField : loginField).requestFocusInWindow());
     }
 
+    private void showForgotPassword() {
+        clearErrors();
+        forgotPasswordMode = true;
+        signUpMode = false;
+        setAuthCardHeight(AUTH_CARD_FORGOT_HEIGHT);
+        setTitle("Java Chat - Quên mật khẩu");
+        modeSwitch.setVisible(false);
+        heading.setText("Quên mật khẩu?");
+        subheading.setText("Đừng lo, Java Chat sẽ giúp bạn quay lại.");
+        submitButton.setText("Gửi liên kết đặt lại");
+        submitButton.setEnabled(true);
+        authCardLayout.show(authCards, "forgot");
+        String login = loginField.getText().trim();
+        if (login.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            forgotEmailField.setText(login);
+        }
+        javax.swing.SwingUtilities.invokeLater(forgotEmailField::requestFocusInWindow);
+    }
+
+    private void handleEscape() {
+        if (forgotPasswordMode) {
+            setMode(false);
+            return;
+        }
+        dispose();
+    }
+
     private void submit() {
         clearErrors();
+        if (forgotPasswordMode) {
+            submitForgotPassword();
+            return;
+        }
         if (signUpMode) {
             submitRegistration();
             return;
@@ -346,6 +427,34 @@ public final class LoginFrame extends JFrame {
         });
         timer.setRepeats(false);
         timer.start();
+    }
+
+    private void submitForgotPassword() {
+        String email = forgotEmailField.getText().trim();
+        if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            showFieldError(forgotEmailField, forgotEmailError, "Vui lòng nhập một địa chỉ email hợp lệ.");
+            return;
+        }
+
+        submitButton.setEnabled(false);
+        submitButton.setText("Đang gửi email...");
+        setStatus("Đang kiểm tra tài khoản...", false);
+        forgotPasswordTimer = new Timer(650, event -> {
+            cancelForgotPasswordRequest();
+            if (!forgotPasswordMode) return;
+            submitButton.setEnabled(true);
+            submitButton.setText("Gửi lại email");
+            setStatus("Nếu email đã đăng ký, liên kết đặt lại sẽ được gửi đến hộp thư của bạn.", false);
+        });
+        forgotPasswordTimer.setRepeats(false);
+        forgotPasswordTimer.start();
+    }
+
+    private void cancelForgotPasswordRequest() {
+        if (forgotPasswordTimer != null) {
+            forgotPasswordTimer.stop();
+            forgotPasswordTimer = null;
+        }
     }
 
     private void submitRegistration() {
@@ -397,6 +506,7 @@ public final class LoginFrame extends JFrame {
         registrationPasswordError.setText(" ");
         confirmPasswordError.setText(" ");
         termsError.setText(" ");
+        forgotEmailError.setText(" ");
         formStatus.setText(" ");
         setInvalid(loginField, false);
         setInvalid(passwordField, false);
@@ -404,6 +514,7 @@ public final class LoginFrame extends JFrame {
         setInvalid(registrationEmailField, false);
         setInvalid(registrationPasswordField, false);
         setInvalid(confirmPasswordField, false);
+        setInvalid(forgotEmailField, false);
     }
 
     private void showFieldError(JTextField field, JLabel label, String message) {
@@ -805,6 +916,48 @@ public final class LoginFrame extends JFrame {
         @Override protected void paintComponent(Graphics graphics) {
             RoundedFieldSupport.paintBackground(this, graphics, invalid);
             super.paintComponent(graphics);
+        }
+    }
+
+    private static final class CheckBoxIcon implements javax.swing.Icon {
+        private static final int SIZE = 19;
+        private final boolean selected;
+        private final boolean enabled;
+
+        CheckBoxIcon(boolean selected) {
+            this(selected, true);
+        }
+
+        CheckBoxIcon(boolean selected, boolean enabled) {
+            this.selected = selected;
+            this.enabled = enabled;
+        }
+
+        @Override public int getIconWidth() { return SIZE; }
+        @Override public int getIconHeight() { return SIZE; }
+
+        @Override
+        public void paintIcon(java.awt.Component component, Graphics graphics, int x, int y) {
+            Graphics2D g = (Graphics2D) graphics.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            Color fill = selected ? ORANGE : SURFACE;
+            Color outline = selected ? ORANGE : BORDER;
+            if (!enabled) {
+                fill = new Color(fill.getRed(), fill.getGreen(), fill.getBlue(), 110);
+                outline = new Color(outline.getRed(), outline.getGreen(), outline.getBlue(), 110);
+            }
+            g.setColor(fill);
+            g.fillRoundRect(x, y, SIZE - 1, SIZE - 1, 6, 6);
+            g.setColor(outline);
+            g.setStroke(new BasicStroke(1.5f));
+            g.drawRoundRect(x + 1, y + 1, SIZE - 3, SIZE - 3, 5, 5);
+            if (selected) {
+                g.setColor(Color.WHITE);
+                g.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g.drawLine(x + 5, y + 9, x + 8, y + 12);
+                g.drawLine(x + 8, y + 12, x + 14, y + 6);
+            }
+            g.dispose();
         }
     }
 
