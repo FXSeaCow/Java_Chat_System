@@ -144,6 +144,14 @@ public final class UserClientApp {
                 return null;
             });
         });
+        frame.setProfileUpdateListener(request -> {
+            if (api == null) {
+                frame.setProfileUpdateSucceeded(current.get().updateProfile(request));
+                refresh(frame, current.get());
+            } else {
+                frame.setProfileUpdateFailed("Server chưa hỗ trợ cập nhật thông tin tài khoản.");
+            }
+        });
         if (api == null) {
             frame.setAiSuggestionListener(request -> frame.setAiSuggestionResult(request.conversationId(),
                     new AiDtos.ChatResponse(1L, "Mình đang làm phần JDBC, lát nữa gửi bạn xem nhé.",
@@ -164,6 +172,7 @@ public final class UserClientApp {
     }
 
     private static void refresh(MainFrame frame, MockChatStore store) {
+        frame.setCurrentUser(store.currentUser());
         frame.setPeople(store.people());
         frame.setFriendIds(store.friendIds());
         frame.setPendingFriendIds(store.pendingFriendIds());

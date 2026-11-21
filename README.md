@@ -8,7 +8,8 @@ The `server` module contains the local HTTP API and depends on
 `user-client` module contains the chat UI: the main window and conversation
 list (JC-25), the chat frame (JC-26), history search (JC-27), the AI reply
 suggestion panel (JC-28), the friend list screen (JC-30), the friend request
-screen (JC-31), and the online friends screen (JC-32).
+screen (JC-31), the online friends screen (JC-32), and the account profile
+screen (JC-22).
 
 Build all modules from the repository root with `mvn verify`.
 
@@ -84,5 +85,12 @@ forward each `USER_PRESENCE_CHANGED_EVENT` payload to
 uses the same listener as the friends screen. Presence is transient and has no
 table in the current schema, so demo mode simulates user ID 2 changing status
 every 10 seconds.
+
+Use **Tài khoản** to view and edit the signed-in user's profile. Pass the user
+with `MainFrame.setCurrentUser(...)`; saving the form calls
+`setProfileUpdateListener(...)` with a `ProfileUpdateRequest`. Report the result
+with `setProfileUpdateSucceeded(updatedUser)` or `setProfileUpdateFailed(message)`
+on the Swing event dispatch thread. Demo mode saves changes in memory; live mode
+reports that the server does not support profile updates yet.
 
 AI usage for each Jira ticket is logged in `docs/ai-log/`.

@@ -1,5 +1,6 @@
 package com.javachat.user.mock;
 
+import com.javachat.shared.dto.AuthDtos;
 import com.javachat.shared.dto.ChatDtos.ConversationSummary;
 import com.javachat.shared.dto.ChatDtos.MessageSendRequest;
 import com.javachat.shared.dto.FriendDtos.FriendListResponse;
@@ -165,6 +166,21 @@ public final class MockChatStore {
 
     public List<User> allUsers() {
         return List.copyOf(users.values());
+    }
+
+    public User currentUser() {
+        return users.get(CURRENT_USER_ID);
+    }
+
+    /** Apply a profile update to the signed-in user and return the updated record. */
+    public User updateProfile(AuthDtos.ProfileUpdateRequest request) {
+        User old = currentUser();
+        if (old == null) throw new IllegalStateException("Không tìm thấy tài khoản hiện tại.");
+        User updated = new User(old.id(), old.username(), old.email(), request.displayName(),
+                request.avatarUrl(), request.address(), request.dateOfBirth(), request.gender(),
+                old.role(), old.status(), old.createdAt(), Instant.now());
+        users.put(old.id(), updated);
+        return updated;
     }
 
     public FriendListResponse friendList() {
