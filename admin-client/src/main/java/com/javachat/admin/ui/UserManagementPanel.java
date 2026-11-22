@@ -8,6 +8,7 @@ import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.RowFilter;
+import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.table.TableModel;
@@ -18,10 +19,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /** Live account list with reversible USER account moderation. */
 final class UserManagementPanel extends JPanel {
-    UserManagementPanel(List<Map<String, Object>> users, BiConsumer<Long, String> onStatusChange) {
+    UserManagementPanel(List<Map<String, Object>> users, BiConsumer<Long, String> onStatusChange,
+                        Consumer<AdminUserDialog.Input> onCreate,
+                        BiConsumer<Long, AdminUserDialog.Input> onEdit) {
         setLayout(new BorderLayout());
         JTable table = AdminTheme.table(AdminData.table(users, row -> new Object[] {
                 AdminData.text(row, "display_name"), AdminData.text(row, "username"),
@@ -34,22 +38,30 @@ final class UserManagementPanel extends JPanel {
 
         JPanel surface = AdminTheme.surface();
         surface.setLayout(new BorderLayout(0, 14));
-        JPanel toolbar = new JPanel(new BorderLayout());
+        JPanel toolbar = new JPanel(new BorderLayout(0, 8));
         toolbar.setOpaque(false);
+        JPanel filters = new JPanel(new BorderLayout(12, 0));
+        filters.setOpaque(false);
         JTextField search = AdminTheme.searchField("Tìm họ tên, email hoặc tên đăng nhập");
-        toolbar.add(search, BorderLayout.WEST);
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        actions.setOpaque(false);
+        filters.add(search, BorderLayout.WEST);
         JComboBox<String> statusFilter = new JComboBox<>(new String[] {"Tất cả", "Hoạt động", "Bị khóa"});
         AdminTheme.styleComboBox(statusFilter);
+        filters.add(statusFilter, BorderLayout.EAST);
+        toolbar.add(filters, BorderLayout.NORTH);
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        actions.setOpaque(false);
+        JButton create = AdminTheme.button("Thêm người dùng", true);
+        JButton edit = AdminTheme.button("Sửa thông tin", false);
         JButton block = AdminTheme.button("Khóa tài khoản", false);
-        JButton unblock = AdminTheme.button("Mở khóa", true);
+        JButton unblock = AdminTheme.button("Mở khóa", false);
+        edit.setEnabled(false);
         block.setEnabled(false);
         unblock.setEnabled(false);
-        actions.add(statusFilter);
+        actions.add(create);
+        actions.add(edit);
         actions.add(block);
         actions.add(unblock);
-        toolbar.add(actions, BorderLayout.EAST);
+        toolbar.add(actions, BorderLayout.SOUTH);
 
         Runnable updateFilter = () -> {
             String query = search.getText().trim().toLowerCase(Locale.ROOT);
@@ -77,8 +89,20 @@ final class UserManagementPanel extends JPanel {
             int selected = table.getSelectedRow();
             String status = selected < 0 ? "" : AdminData.text(
                     users.get(table.convertRowIndexToModel(selected)), "status");
+            edit.setEnabled(selected >= 0);
             block.setEnabled("ACTIVE".equals(status));
             unblock.setEnabled("BLOCKED".equals(status));
+        });
+        create.addActionListener(event -> {
+            AdminUserDialog.Input input = AdminUserDialog.showCreate(SwingUtilities.getWindowAncestor(this));
+            if (input != null) onCreate.accept(input);
+        });
+        edit.addActionListener(event -> {
+            int selected = table.getSelectedRow();
+            if (selected < 0) return;
+            Map<String, Object> user = users.get(table.convertRowIndexToModel(selected));
+            AdminUserDialog.Input input = AdminUserDialog.showEdit(SwingUtilities.getWindowAncestor(this), user);
+            if (input != null) onEdit.accept(AdminData.number(user, "id"), input);
         });
         block.addActionListener(event -> changeStatus(table, users, onStatusChange, "BLOCKED"));
         unblock.addActionListener(event -> changeStatus(table, users, onStatusChange, "ACTIVE"));

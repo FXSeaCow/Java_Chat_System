@@ -147,6 +147,35 @@ public final class AdminRepository {
         }
     }
 
+    public long createUser(String displayName, String username, String email, String password) throws SQLException {
+        return new AccountRepository(config).registerWithUsername(displayName, username, email, password);
+    }
+
+    public void updateUser(long userId, String displayName, String username, String email) throws SQLException {
+        String name = displayName.strip();
+        String login = username.strip();
+        String normalizedEmail = email.strip().toLowerCase(java.util.Locale.ROOT);
+        if (name.length() < 2 || name.length() > 100)
+            throw new IllegalArgumentException("Họ tên phải có từ 2 đến 100 ký tự.");
+        if (!login.matches("[A-Za-z0-9._-]{3,50}"))
+            throw new IllegalArgumentException("Tên đăng nhập cần 3–50 ký tự chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.");
+        if (normalizedEmail.length() > 255 ||
+                !normalizedEmail.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
+            throw new IllegalArgumentException("Email không hợp lệ.");
+        try (Connection connection = config.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE public.users SET display_name = ?, username = ?, email = ?
+                     WHERE id = ? AND role = 'USER' AND status IN ('ACTIVE', 'BLOCKED')
+                     """)) {
+            statement.setString(1, name);
+            statement.setString(2, login);
+            statement.setString(3, normalizedEmail);
+            statement.setLong(4, userId);
+            if (statement.executeUpdate() != 1)
+                throw new IllegalArgumentException("Tài khoản người dùng không còn khả dụng.");
+        }
+    }
+
     private static List<Map<String, Object>> rows(Connection connection, String sql) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement(sql);
              ResultSet result = statement.executeQuery()) {

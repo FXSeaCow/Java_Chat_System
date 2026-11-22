@@ -183,7 +183,8 @@ public final class AdminFrame extends JFrame {
         cards.add(new LoginHistoryPanel(AdminData.rows(snapshot, "loginHistory")), "history");
         cards.add(new GroupListPanel(AdminData.rows(snapshot, "groups")), "groups");
         cards.add(new SpamReportPanel(AdminData.rows(snapshot, "reports"), this::updateReport), "reports");
-        cards.add(new UserManagementPanel(AdminData.rows(snapshot, "users"), this::updateUserStatus), "users");
+        cards.add(new UserManagementPanel(AdminData.rows(snapshot, "users"), this::updateUserStatus,
+                this::createUser, this::editUser), "users");
         cards.add(new NewUserPanel(AdminData.rows(snapshot, "newUsers")), "new-users");
         cards.add(new ActiveUserPanel(AdminData.rows(snapshot, "activeUsers")), "active-users");
         cards.add(new RegistrationChartPanel(AdminData.rows(snapshot, "registrationTrend")), "chart");
@@ -237,6 +238,28 @@ public final class AdminFrame extends JFrame {
             }
         }.execute();
     }
+
+    private void createUser(AdminUserDialog.Input input) {
+        runUserChange(() -> api.createUser(input.displayName(), input.username(),
+                input.email(), input.password()));
+    }
+
+    private void editUser(long userId, AdminUserDialog.Input input) {
+        runUserChange(() -> api.updateUser(userId, input.displayName(), input.username(), input.email()));
+    }
+
+    private void runUserChange(UserChange action) {
+        new SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() throws Exception { action.run(); return null; }
+            @Override protected void done() {
+                try { get(); refresh(); }
+                catch (InterruptedException error) { Thread.currentThread().interrupt(); }
+                catch (ExecutionException error) { showError(error.getCause()); }
+            }
+        }.execute();
+    }
+
+    @FunctionalInterface private interface UserChange { void run() throws Exception; }
 
     private void logout() {
         new SwingWorker<Void, Void>() {

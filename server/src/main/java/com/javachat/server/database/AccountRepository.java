@@ -25,26 +25,33 @@ public final class AccountRepository {
     }
 
     public long register(String displayName, String email, String password) throws SQLException {
+        byte[] random = new byte[16];
+        new SecureRandom().nextBytes(random);
+        return registerWithUsername(displayName, "user_" + HexFormat.of().formatHex(random), email, password);
+    }
+
+    public long registerWithUsername(String displayName, String username, String email, String password)
+            throws SQLException {
         String name = displayName.strip();
+        String normalizedUsername = username.strip();
         String normalizedEmail = email.strip().toLowerCase(Locale.ROOT);
         if (name.length() < 2 || name.length() > 100)
             throw new IllegalArgumentException("Họ tên phải có từ 2 đến 100 ký tự.");
+        if (!normalizedUsername.matches("[A-Za-z0-9._-]{3,50}"))
+            throw new IllegalArgumentException("Tên đăng nhập cần 3–50 ký tự chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.");
         if (normalizedEmail.length() > 255 ||
                 !normalizedEmail.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
             throw new IllegalArgumentException("Email không hợp lệ.");
         if (password.length() < 8 || password.length() > 72)
             throw new IllegalArgumentException("Mật khẩu phải có từ 8 đến 72 ký tự.");
 
-        byte[] random = new byte[16];
-        new SecureRandom().nextBytes(random);
-        String username = "user_" + HexFormat.of().formatHex(random);
         String passwordHash = hashPassword(password);
         try (Connection connection = config.openConnection();
              PreparedStatement statement = connection.prepareStatement("""
                      INSERT INTO public.users (username, email, password_hash, display_name)
                      VALUES (?, ?, ?, ?) RETURNING id
                      """)) {
-            statement.setString(1, username);
+            statement.setString(1, normalizedUsername);
             statement.setString(2, normalizedEmail);
             statement.setString(3, passwordHash);
             statement.setString(4, name);

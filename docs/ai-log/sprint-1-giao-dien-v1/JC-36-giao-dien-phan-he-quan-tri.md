@@ -137,3 +137,24 @@ Thêm trang quản lý tài khoản người dùng trong phân hệ quản trị
 - Render headless trang mới và kiểm tra tìm kiếm, lọc trạng thái, ánh xạ nút
   mở khóa tới đúng ID tài khoản.
 - Chưa thực hiện khóa/mở khóa trên dữ liệu thật trong lúc kiểm tra.
+
+## Dialog thêm và sửa người dùng
+
+### Yêu cầu
+
+Thêm dialog cho admin tạo và cập nhật tài khoản `USER` từ trang quản lý.
+
+### AI đã làm gì
+
+- Thêm dialog cùng theme kem/teal với kiểm tra họ tên, tên đăng nhập, email và
+  mật khẩu khi tạo mới. Dialog sửa cập nhật họ tên, tên đăng nhập và email.
+- Thêm API admin tạo/cập nhật người dùng; server giới hạn sửa tài khoản có
+  `role = 'USER'`, kiểm tra dữ liệu và dùng cùng thuật toán hash mật khẩu của
+  luồng đăng ký hiện tại.
+- Sau thao tác thành công, tải lại snapshot để bảng phản ánh dữ liệu đã lưu.
+
+### Kiểm tra
+
+- Biên dịch toàn bộ mã Java; render headless trang quản lý và chạy kiểm tra tìm
+  kiếm, lọc, ánh xạ hành động theo ID tài khoản.
+- Chưa thêm hoặc sửa tài khoản trên Supabase thật trong lúc kiểm tra.

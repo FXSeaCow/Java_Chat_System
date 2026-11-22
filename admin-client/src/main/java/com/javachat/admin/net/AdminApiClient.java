@@ -49,6 +49,16 @@ public final class AdminApiClient {
         request("POST", "/api/admin/users/status", Map.of("userId", userId, "status", status));
     }
 
+    public void createUser(String displayName, String username, String email, String password) throws IOException {
+        request("POST", "/api/admin/users/create", Map.of(
+                "displayName", displayName, "username", username, "email", email, "password", password));
+    }
+
+    public void updateUser(long userId, String displayName, String username, String email) throws IOException {
+        request("POST", "/api/admin/users/update", Map.of(
+                "userId", userId, "displayName", displayName, "username", username, "email", email));
+    }
+
     public void logout() throws IOException {
         try { request("POST", "/api/admin/auth/logout", Map.of()); }
         finally { token = null; }

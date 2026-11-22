@@ -31,6 +31,11 @@ dùng** page searches and filters `USER` accounts, and can block or unblock a
 selected account. Blocking also ends all of that account's active sessions;
 unblocking does not restore old sessions. Admin accounts are excluded from
 these actions.
+The same page has **Thêm người dùng** and **Sửa thông tin** dialogs. Admins can
+create a `USER` account with display name, username, email, and password, or
+edit an existing user's display name, username, and email. The dialogs validate
+input before calling the role-protected server API and refresh the list after
+the database write succeeds.
 The active-user screen shows accounts with unexpired login sessions; it is not
 a real-time presence feed. Admin lists return at most 500 recent rows per page.
 

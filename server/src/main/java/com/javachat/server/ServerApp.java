@@ -117,6 +117,20 @@ public final class ServerApp {
                     respond(exchange, 200, Map.of("ok", true));
                     return;
                 }
+                if ("/api/admin/users/create".equals(path)) {
+                    long createdId = new AdminRepository(databaseConfig).createUser(
+                            string(body, "displayName"), string(body, "username"),
+                            string(body, "email"), string(body, "password"));
+                    respond(exchange, 201, Map.of("userId", createdId));
+                    return;
+                }
+                if ("/api/admin/users/update".equals(path)) {
+                    new AdminRepository(databaseConfig).updateUser(
+                            number(body, "userId"), string(body, "displayName"),
+                            string(body, "username"), string(body, "email"));
+                    respond(exchange, 200, Map.of("ok", true));
+                    return;
+                }
                 respond(exchange, 404, Map.of("error", "Unknown API endpoint"));
                 return;
             }
@@ -175,7 +189,7 @@ public final class ServerApp {
             System.err.println("Database error SQLSTATE " + error.getSQLState());
             respond(exchange, "23505".equals(error.getSQLState()) ? 409 : 500,
                     Map.of("error", "23505".equals(error.getSQLState())
-                            ? "Email đã được đăng ký." : "Database operation failed"));
+                            ? "Email hoặc tên đăng nhập đã được sử dụng." : "Database operation failed"));
         } catch (RuntimeException error) {
             System.err.println("API error: " + error.getClass().getSimpleName());
             respond(exchange, 500, Map.of("error", "Server operation failed"));
