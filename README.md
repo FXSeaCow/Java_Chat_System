@@ -4,14 +4,25 @@ The repository uses a Maven multi-module build. The `common` module contains
 the protocol types, DTOs, and models shared by the server and clients. Its Java
 package remains `com.javachat.shared` for compatibility with existing imports.
 The `server` module contains the local HTTP API and depends on
-`common`. The `admin-client` module is a frontend source skeleton. The
-`user-client` module contains the chat UI: the main window and conversation
-list (JC-25), the chat frame (JC-26), history search (JC-27), the AI reply
+`common`. The `admin-client` module contains the Swing admin dashboard with
+screens for login history, groups, spam reports, new users, active users, and
+registration statistics. The `user-client` module contains the chat UI: the
+main window and conversation list (JC-25), the chat frame (JC-26), history
+search (JC-27), the AI reply
 suggestion panel (JC-28), the friend list screen (JC-30), the friend request
 screen (JC-31), the online friends screen (JC-32), and the account profile
 screen (JC-22).
 
 Build all modules from the repository root with `mvn verify`.
+
+To preview the admin dashboard on Windows, run this from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run-admin.ps1
+```
+
+The admin screens currently use sample rows and do not query Supabase. They
+do not have admin sign-in or database write actions yet.
 
 Copy `config.properties.example` to `config.properties` and enter the host,
 port, username, and password shown in Supabase Dashboard > Connect. Use the
