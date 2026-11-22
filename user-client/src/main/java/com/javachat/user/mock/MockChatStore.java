@@ -1,5 +1,6 @@
 package com.javachat.user.mock;
 
+import com.javachat.shared.dto.AuthDtos;
 import com.javachat.shared.dto.ChatDtos.ConversationSummary;
 import com.javachat.shared.dto.ChatDtos.MessageSendRequest;
 import com.javachat.shared.dto.FriendDtos.FriendListResponse;
@@ -27,7 +28,7 @@ import java.util.stream.Collectors;
  * Changes made in the preview live only until the application closes.
  */
 public final class MockChatStore {
-    public static final long CURRENT_USER_ID = 1L;
+    private long currentUserId = 1L;
     private static final ZoneId SEED_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final Map<Long, User> users = new LinkedHashMap<>();
@@ -51,9 +52,8 @@ public final class MockChatStore {
 
     /** Builds the same view model from rows returned by the server API. */
     public static MockChatStore fromSnapshot(Map<String, Object> snapshot) {
-        if (number(snapshot, "currentUserId") != CURRENT_USER_ID)
-            throw new IllegalArgumentException("This desktop preview expects user ID 1");
         MockChatStore store = new MockChatStore(false);
+        store.currentUserId = number(snapshot, "currentUserId");
         for (Object value : Json.array(snapshot.get("users"))) {
             Map<String, Object> row = Json.object(value);
             long id = number(row, "id");
@@ -158,7 +158,7 @@ public final class MockChatStore {
 
     public List<User> people() {
         return users.values().stream()
-                .filter(user -> user.id() != CURRENT_USER_ID && user.role() == UserRole.USER
+                .filter(user -> user.id() != currentUserId && user.role() == UserRole.USER
                         && user.status() == UserStatus.ACTIVE)
                 .toList();
     }
@@ -167,16 +167,35 @@ public final class MockChatStore {
         return List.copyOf(users.values());
     }
 
+    public User currentUser() {
+        return users.get(currentUserId);
+    }
+
+    public long currentUserId() {
+        return currentUserId;
+    }
+
+    /** Apply a profile update to the signed-in user and return the updated record. */
+    public User updateProfile(AuthDtos.ProfileUpdateRequest request) {
+        User old = currentUser();
+        if (old == null) throw new IllegalStateException("Không tìm thấy tài khoản hiện tại.");
+        User updated = new User(old.id(), old.username(), old.email(), request.displayName(),
+                request.avatarUrl(), request.address(), request.dateOfBirth(), request.gender(),
+                old.role(), old.status(), old.createdAt(), Instant.now());
+        users.put(old.id(), updated);
+        return updated;
+    }
+
     public FriendListResponse friendList() {
         List<User> friends = friendships.stream()
                 .filter(item -> item.status() == FriendshipStatus.ACCEPTED && isMine(item))
                 .map(item -> users.get(otherUserId(item))).toList();
         List<Friendship> incoming = friendships.stream()
                 .filter(item -> item.status() == FriendshipStatus.PENDING
-                        && item.addresseeId() == CURRENT_USER_ID).toList();
+                        && item.addresseeId() == currentUserId).toList();
         List<Friendship> outgoing = friendships.stream()
                 .filter(item -> item.status() == FriendshipStatus.PENDING
-                        && item.requesterId() == CURRENT_USER_ID).toList();
+                        && item.requesterId() == currentUserId).toList();
         return new FriendListResponse(friends, incoming, outgoing);
     }
 
@@ -198,14 +217,14 @@ public final class MockChatStore {
     public void sendFriendRequest(long addresseeId) {
         if (!users.containsKey(addresseeId) || friendIds().contains(addresseeId)
                 || pendingFriendIds().contains(addresseeId)) return;
-        friendships.add(new Friendship(nextFriendshipId++, CURRENT_USER_ID, addresseeId,
+        friendships.add(new Friendship(nextFriendshipId++, currentUserId, addresseeId,
                 FriendshipStatus.PENDING, Instant.now(), null));
     }
 
     public void respondToFriendRequest(long friendshipId, boolean accept) {
         for (int i = 0; i < friendships.size(); i++) {
             Friendship item = friendships.get(i);
-            if (item.id() == friendshipId && item.addresseeId() == CURRENT_USER_ID
+            if (item.id() == friendshipId && item.addresseeId() == currentUserId
                     && item.status() == FriendshipStatus.PENDING) {
                 friendships.remove(i);
                 if (accept) {
@@ -220,7 +239,7 @@ public final class MockChatStore {
 
     public List<ConversationSummary> conversationSummaries() {
         return conversations.values().stream()
-                .filter(conversation -> activeMember(conversation.id(), CURRENT_USER_ID) != null)
+                .filter(conversation -> activeMember(conversation.id(), currentUserId) != null)
                 .map(this::summary)
                 .sorted(Comparator.comparing((ConversationSummary item) ->
                         item.conversation().updatedAt()).reversed())
@@ -230,7 +249,7 @@ public final class MockChatStore {
     public ConversationSummary directConversationWith(long userId) {
         return conversations.values().stream()
                 .filter(item -> item.type() == ConversationType.DIRECT
-                        && activeMember(item.id(), CURRENT_USER_ID) != null
+                        && activeMember(item.id(), currentUserId) != null
                         && activeMember(item.id(), userId) != null)
                 .findFirst().map(this::summary).orElse(null);
     }
@@ -240,11 +259,11 @@ public final class MockChatStore {
     }
 
     public ChatMessage send(MessageSendRequest request) {
-        if (activeMember(request.conversationId(), CURRENT_USER_ID) == null) {
+        if (activeMember(request.conversationId(), currentUserId) == null) {
             throw new IllegalArgumentException("Not a member of conversation " + request.conversationId());
         }
         Instant sentAt = Instant.now();
-        ChatMessage message = new ChatMessage(nextMessageId++, request.conversationId(), CURRENT_USER_ID,
+        ChatMessage message = new ChatMessage(nextMessageId++, request.conversationId(), currentUserId,
                 request.replyToId(), request.content(), request.messageType(), ChatMessageStatus.SENT,
                 sentAt, null, List.of());
         messages.computeIfAbsent(request.conversationId(), ignored -> new ArrayList<>()).add(message);
@@ -256,7 +275,7 @@ public final class MockChatStore {
 
     public List<GroupDetails> myGroups() {
         return groups.values().stream()
-                .filter(group -> activeMember(group.conversationId(), CURRENT_USER_ID) != null)
+                .filter(group -> activeMember(group.conversationId(), currentUserId) != null)
                 .toList();
     }
 
@@ -267,7 +286,7 @@ public final class MockChatStore {
 
     public void updateGroup(GroupUpdateRequest request) {
         GroupDetails old = groups.get(request.conversationId());
-        if (old == null || old.ownerId() != CURRENT_USER_ID) return;
+        if (old == null || old.ownerId() != currentUserId) return;
         groups.put(old.conversationId(), new GroupDetails(old.conversationId(), old.ownerId(),
                 request.name(), request.avatarUrl(), request.description(), old.createdAt()));
     }
@@ -275,13 +294,13 @@ public final class MockChatStore {
     public ConversationSummary createGroup(GroupCreateRequest request) {
         long id = nextConversationId++;
         Instant now = Instant.now();
-        Conversation conversation = new Conversation(id, ConversationType.GROUP, CURRENT_USER_ID, now, now);
+        Conversation conversation = new Conversation(id, ConversationType.GROUP, currentUserId, now, now);
         conversations.put(id, conversation);
-        groups.put(id, new GroupDetails(id, CURRENT_USER_ID, request.name(), request.avatarUrl(),
+        groups.put(id, new GroupDetails(id, currentUserId, request.name(), request.avatarUrl(),
                 request.description(), now));
-        members.add(new ConversationMember(id, CURRENT_USER_ID, MemberRole.OWNER, now, null, now));
+        members.add(new ConversationMember(id, currentUserId, MemberRole.OWNER, now, null, now));
         for (long userId : request.initialMemberIds()) {
-            if (userId != CURRENT_USER_ID && users.containsKey(userId)) {
+            if (userId != currentUserId && users.containsKey(userId)) {
                 members.add(new ConversationMember(id, userId, MemberRole.MEMBER, now, null, null));
             }
         }
@@ -314,17 +333,17 @@ public final class MockChatStore {
         } else {
             User other = members.stream()
                     .filter(item -> item.conversationId() == conversation.id()
-                            && item.userId() != CURRENT_USER_ID && item.leftAt() == null)
+                            && item.userId() != currentUserId && item.leftAt() == null)
                     .map(item -> users.get(item.userId())).findFirst().orElse(null);
             title = other == null ? "Hội thoại" : other.displayName();
             if (other != null) avatarUrl = other.avatarUrl();
         }
         ChatMessage last = messages.getOrDefault(conversation.id(), List.of()).stream()
                 .max(Comparator.comparing(ChatMessage::createdAt)).orElse(null);
-        ConversationMember mine = activeMember(conversation.id(), CURRENT_USER_ID);
+        ConversationMember mine = activeMember(conversation.id(), currentUserId);
         int unread = (int) messages.getOrDefault(conversation.id(), List.of()).stream()
                 .filter(message -> message.senderId() != null
-                        && message.senderId() != CURRENT_USER_ID
+                        && message.senderId() != currentUserId
                         && (mine.lastReadAt() == null || message.createdAt().isAfter(mine.lastReadAt())))
                 .count();
         return new ConversationSummary(conversation, title, avatarUrl, last, unread);
@@ -339,17 +358,17 @@ public final class MockChatStore {
         if (directConversationWith(otherUserId) != null) return;
         long id = nextConversationId++;
         Instant now = Instant.now();
-        conversations.put(id, new Conversation(id, ConversationType.DIRECT, CURRENT_USER_ID, now, now));
-        members.add(new ConversationMember(id, CURRENT_USER_ID, MemberRole.MEMBER, now, null, now));
+        conversations.put(id, new Conversation(id, ConversationType.DIRECT, currentUserId, now, now));
+        members.add(new ConversationMember(id, currentUserId, MemberRole.MEMBER, now, null, now));
         members.add(new ConversationMember(id, otherUserId, MemberRole.MEMBER, now, null, null));
     }
 
     private boolean isMine(Friendship friendship) {
-        return friendship.requesterId() == CURRENT_USER_ID || friendship.addresseeId() == CURRENT_USER_ID;
+        return friendship.requesterId() == currentUserId || friendship.addresseeId() == currentUserId;
     }
 
     private long otherUserId(Friendship friendship) {
-        return friendship.requesterId() == CURRENT_USER_ID
+        return friendship.requesterId() == currentUserId
                 ? friendship.addresseeId() : friendship.requesterId();
     }
 
