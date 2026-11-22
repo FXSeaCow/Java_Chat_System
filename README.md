@@ -8,7 +8,8 @@ The `server` module contains the local HTTP API and depends on
 `user-client` module contains the chat UI: the main window and conversation
 list (JC-25), the chat frame (JC-26), history search (JC-27), the AI reply
 suggestion panel (JC-28), the friend list screen (JC-30), the friend request
-screen (JC-31), and the online friends screen (JC-32).
+screen (JC-31), the online friends screen (JC-32), and the account profile
+screen (JC-22).
 
 Build all modules from the repository root with `mvn verify`.
 
@@ -46,9 +47,25 @@ separate PowerShell terminals from the repository root:
 The client connects to `http://127.0.0.1:8080` by default. If you change
 `server.port`, set `JAVA_CHAT_API_URL` to the matching loopback URL before
 starting the client. The server reads and writes conversations, messages,
-friend requests, and groups in PostgreSQL. It binds only to loopback and uses
-`server.user_id=1` as a development account; account login is not implemented.
+friend requests, and groups in PostgreSQL. It binds only to loopback. Sign-in
+checks `public.users` and creates a session in `public.auth_sessions`; each API
+request uses the signed-in account's ID.
 Presence and AI suggestions are still unavailable in live mode.
+
+In live mode, the registration form calls `POST /api/auth/register` on the local
+server and inserts a row into `public.users`. Passwords are stored as PBKDF2
+hashes. Registration requires the server and database to be reachable; demo
+mode does not save accounts. Log in with the registered email and password.
+Use **Tài khoản > Đăng xuất** to return to the sign-in screen. In live mode,
+logout marks the current row in `public.auth_sessions` as logged out and clears
+the desktop token. In demo mode, it returns to the demo sign-in screen.
+Use **Tài khoản > Đổi mật khẩu** to enter the current and new password. The live
+server verifies the current password, stores a new PBKDF2 hash, ends all active
+sessions for the account, and asks the user to sign in again. Demo mode does
+not change passwords.
+Existing seed accounts use bcrypt hashes through the Supabase `pgcrypto`
+extension. The current seed hash does not match the password stated in
+`database/seed.sql`, so use a newly registered account for live sign-in.
 
 To preview the chat UI with sample data, run
 `com.javachat.user.UserClientApp` from the `user-client` module with `--demo`.
@@ -84,5 +101,12 @@ forward each `USER_PRESENCE_CHANGED_EVENT` payload to
 uses the same listener as the friends screen. Presence is transient and has no
 table in the current schema, so demo mode simulates user ID 2 changing status
 every 10 seconds.
+
+Use **Tài khoản** to view and edit the signed-in user's profile. Pass the user
+with `MainFrame.setCurrentUser(...)`; saving the form calls
+`setProfileUpdateListener(...)` with a `ProfileUpdateRequest`. Report the result
+with `setProfileUpdateSucceeded(updatedUser)` or `setProfileUpdateFailed(message)`
+on the Swing event dispatch thread. Demo mode saves changes in memory; live mode
+reports that the server does not support profile updates yet.
 
 AI usage for each Jira ticket is logged in `docs/ai-log/`.

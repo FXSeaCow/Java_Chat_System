@@ -2,7 +2,8 @@
 -- Target: PostgreSQL / Supabase
 -- Run database/schema.sql before this file.
 -- Run only on an empty database; this file inserts fixed demo IDs.
--- Demo password for every account: password
+-- Seed bcrypt hashes are legacy fixtures; they do not verify as "password".
+-- Create a new account through the live registration form to test sign-in.
 
 BEGIN;
 SET LOCAL TIME ZONE 'Asia/Ho_Chi_Minh';

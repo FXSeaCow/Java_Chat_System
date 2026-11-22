@@ -36,6 +36,12 @@ public final class AuthDtos {
         }
     }
 
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {
+        @Override public String toString() {
+            return "ChangePasswordRequest[passwords=<redacted>]";
+        }
+    }
+
     public record AuthResponse(String token, Instant expiresAt, User user) {
     }
 

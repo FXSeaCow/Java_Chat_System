@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $classDir = Join-Path $PSScriptRoot 'out\user-client-demo'
+$resourcesDir = Join-Path $PSScriptRoot 'user-client\src\main\resources'
 $sources = @(
     Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'common\src\main\java'),
                                (Join-Path $PSScriptRoot 'user-client\src\main\java') -Recurse -Filter '*.java' |
@@ -10,5 +11,5 @@ New-Item -ItemType Directory -Force -Path $classDir | Out-Null
 & javac -encoding UTF-8 -d $classDir $sources
 if ($LASTEXITCODE -ne 0) { throw 'Biên dịch Java thất bại.' }
 
-& java -cp $classDir com.javachat.user.UserClientApp --demo
+& java -cp "$classDir;$resourcesDir" com.javachat.user.UserClientApp --demo
 if ($LASTEXITCODE -ne 0) { throw 'Không thể chạy E-Chat demo.' }
