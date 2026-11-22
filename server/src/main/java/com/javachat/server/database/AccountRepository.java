@@ -25,26 +25,33 @@ public final class AccountRepository {
     }
 
     public long register(String displayName, String email, String password) throws SQLException {
+        byte[] random = new byte[16];
+        new SecureRandom().nextBytes(random);
+        return registerWithUsername(displayName, "user_" + HexFormat.of().formatHex(random), email, password);
+    }
+
+    public long registerWithUsername(String displayName, String username, String email, String password)
+            throws SQLException {
         String name = displayName.strip();
+        String normalizedUsername = username.strip();
         String normalizedEmail = email.strip().toLowerCase(Locale.ROOT);
         if (name.length() < 2 || name.length() > 100)
             throw new IllegalArgumentException("Họ tên phải có từ 2 đến 100 ký tự.");
+        if (!normalizedUsername.matches("[A-Za-z0-9._-]{3,50}"))
+            throw new IllegalArgumentException("Tên đăng nhập cần 3–50 ký tự chữ, số, dấu chấm, gạch dưới hoặc gạch ngang.");
         if (normalizedEmail.length() > 255 ||
                 !normalizedEmail.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
             throw new IllegalArgumentException("Email không hợp lệ.");
         if (password.length() < 8 || password.length() > 72)
             throw new IllegalArgumentException("Mật khẩu phải có từ 8 đến 72 ký tự.");
 
-        byte[] random = new byte[16];
-        new SecureRandom().nextBytes(random);
-        String username = "user_" + HexFormat.of().formatHex(random);
         String passwordHash = hashPassword(password);
         try (Connection connection = config.openConnection();
              PreparedStatement statement = connection.prepareStatement("""
                      INSERT INTO public.users (username, email, password_hash, display_name)
                      VALUES (?, ?, ?, ?) RETURNING id
                      """)) {
-            statement.setString(1, username);
+            statement.setString(1, normalizedUsername);
             statement.setString(2, normalizedEmail);
             statement.setString(3, passwordHash);
             statement.setString(4, name);
@@ -64,6 +71,23 @@ public final class AccountRepository {
     }
 
     public LoginResult login(String login, String password) throws SQLException {
+        return login(login, password, "USER", null, null);
+    }
+
+    public LoginResult loginAdmin(String login, String password) throws SQLException {
+        return login(login, password, "ADMIN", null, null);
+    }
+
+    public LoginResult login(String login, String password, String ipAddress, String deviceInfo) throws SQLException {
+        return login(login, password, "USER", ipAddress, deviceInfo);
+    }
+
+    public LoginResult loginAdmin(String login, String password, String ipAddress, String deviceInfo) throws SQLException {
+        return login(login, password, "ADMIN", ipAddress, deviceInfo);
+    }
+
+    private LoginResult login(String login, String password, String role,
+                              String ipAddress, String deviceInfo) throws SQLException {
         if (login == null || login.isBlank() || password == null || password.isEmpty())
             throw new AuthenticationException();
         try (Connection connection = config.openConnection()) {
@@ -74,10 +98,11 @@ public final class AccountRepository {
                 try (PreparedStatement statement = connection.prepareStatement("""
                         SELECT id, password_hash FROM public.users
                         WHERE (lower(email) = lower(?) OR lower(username) = lower(?))
-                          AND status = 'ACTIVE' AND role = 'USER' FOR UPDATE
+                          AND status = 'ACTIVE' AND role = ? FOR UPDATE
                         """)) {
                     statement.setString(1, login.strip());
                     statement.setString(2, login.strip());
+                    statement.setString(3, role);
                     try (ResultSet result = statement.executeQuery()) {
                         if (!result.next()) throw new AuthenticationException();
                         userId = result.getLong("id");
@@ -89,12 +114,14 @@ public final class AccountRepository {
                 new SecureRandom().nextBytes(tokenBytes);
                 String token = HexFormat.of().formatHex(tokenBytes);
                 try (PreparedStatement session = connection.prepareStatement("""
-                        INSERT INTO public.auth_sessions (user_id, token_hash, expires_at)
-                        VALUES (?, ?, ?)
+                        INSERT INTO public.auth_sessions (user_id, token_hash, expires_at, ip_address, device_info)
+                        VALUES (?, ?, ?, ?, ?)
                         """)) {
                     session.setLong(1, userId);
                     session.setString(2, sha256(token));
                     session.setTimestamp(3, Timestamp.from(Instant.now().plus(7, ChronoUnit.DAYS)));
+                    session.setString(4, ipAddress);
+                    session.setString(5, deviceInfo == null ? null : deviceInfo.substring(0, Math.min(500, deviceInfo.length())));
                     session.executeUpdate();
                 }
                 connection.commit();
@@ -107,6 +134,14 @@ public final class AccountRepository {
     }
 
     public long authenticatedUser(String token) throws SQLException {
+        return authenticated(token, "USER");
+    }
+
+    public long authenticatedAdmin(String token) throws SQLException {
+        return authenticated(token, "ADMIN");
+    }
+
+    private long authenticated(String token, String role) throws SQLException {
         if (token == null || !token.matches("[0-9a-f]{64}")) return -1;
         try (Connection connection = config.openConnection();
              PreparedStatement statement = connection.prepareStatement("""
@@ -114,9 +149,10 @@ public final class AccountRepository {
                      JOIN public.users u ON u.id = s.user_id
                      WHERE s.token_hash = ? AND s.logged_out_at IS NULL
                        AND s.expires_at > CURRENT_TIMESTAMP
-                       AND u.status = 'ACTIVE' AND u.role = 'USER'
+                       AND u.status = 'ACTIVE' AND u.role = ?
                      """)) {
             statement.setString(1, sha256(token));
+            statement.setString(2, role);
             try (ResultSet result = statement.executeQuery()) {
                 return result.next() ? result.getLong(1) : -1;
             }

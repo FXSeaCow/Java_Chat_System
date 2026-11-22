@@ -4,14 +4,62 @@ The repository uses a Maven multi-module build. The `common` module contains
 the protocol types, DTOs, and models shared by the server and clients. Its Java
 package remains `com.javachat.shared` for compatibility with existing imports.
 The `server` module contains the local HTTP API and depends on
-`common`. The `admin-client` module is a frontend source skeleton. The
-`user-client` module contains the chat UI: the main window and conversation
-list (JC-25), the chat frame (JC-26), history search (JC-27), the AI reply
+`common`. The `admin-client` module contains the Swing admin dashboard with
+screens for login history, groups, spam reports, user management, friend
+statistics, new users, active users, and registration statistics. The
+`user-client` module contains the chat UI: the
+main window and conversation list (JC-25), the chat frame (JC-26), history
+search (JC-27), the AI reply
 suggestion panel (JC-28), the friend list screen (JC-30), the friend request
 screen (JC-31), the online friends screen (JC-32), and the account profile
 screen (JC-22).
 
 Build all modules from the repository root with `mvn verify`.
+
+To open the live admin dashboard on Windows, start the server first, then run
+this in another terminal from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\run-admin.ps1
+```
+
+The admin client signs in through `/api/admin/auth/login` using a `public.users`
+account with `role = 'ADMIN'` and `status = 'ACTIVE'`. The server checks the
+session role on every admin request. All eight screens load current Supabase data
+through `/api/admin/snapshot`; **Làm mới** reloads it. Reviewing or dismissing
+a pending spam report updates `public.reports` in Supabase. The **Quản lý người
+dùng** page searches and filters `USER` accounts, and can block or unblock a
+selected account. Blocking also ends all of that account's active sessions;
+unblocking does not restore old sessions. Admin accounts are excluded from
+these actions.
+The same page has **Thêm người dùng** and **Sửa thông tin** dialogs. Admins can
+create a `USER` account with display name, username, email, and password, or
+edit an existing user's display name, username, and email. The dialogs validate
+input before calling the role-protected server API and refresh the list after
+the database write succeeds.
+The **Thống kê bạn bè** page lists each user's accepted direct friendships and
+the distinct people reachable through a direct friend. Its second count
+includes direct friends and friends of friends, excludes the user themself,
+and counts each person once. It supports sorting by Vietnamese display name
+or account creation time, filtering by name, and comparing direct friend counts
+to an entered number (equal, less than, or greater than).
+The active-user screen shows accounts with unexpired login sessions; it is not
+a real-time presence feed. Admin lists return at most 500 recent rows per page.
+
+The seed admin accounts have legacy password hashes that cannot be used with
+the current live login. To create an admin account, register a new account in
+the live user client, then promote that specific account in the Supabase SQL
+Editor (replace the email with the registered email):
+
+```sql
+UPDATE public.users SET role = 'ADMIN'
+WHERE email = 'your-registered-email@example.com' AND status = 'ACTIVE';
+```
+
+Sign in to the admin client with that email and its password. The promoted
+account is reserved for admin sign-in; keep a separate `USER` account for chat.
+Database credentials remain on the server and are never stored in the admin
+client. `JAVA_CHAT_API_URL` also controls the admin client's loopback API URL.
 
 Copy `config.properties.example` to `config.properties` and enter the host,
 port, username, and password shown in Supabase Dashboard > Connect. Use the

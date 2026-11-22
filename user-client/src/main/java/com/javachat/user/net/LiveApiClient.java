@@ -60,7 +60,8 @@ public final class LiveApiClient {
     private Map<String, Object> request(String method, String path, Object body) throws IOException {
         HttpRequest.Builder builder = HttpRequest.newBuilder(base.resolve(path))
                 .timeout(Duration.ofSeconds(20))
-                .header("Accept", "application/json");
+                .header("Accept", "application/json")
+                .header("User-Agent", "E-Chat User Desktop");
         if (token != null) builder.header("Authorization", "Bearer " + token);
         if ("POST".equals(method)) {
             builder.header("Content-Type", "application/json; charset=utf-8")

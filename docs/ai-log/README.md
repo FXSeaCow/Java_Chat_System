@@ -30,6 +30,7 @@ Thư mục này ghi lại phần việc AI hỗ trợ trong từng task Jira (pr
 | Sprint 0 – Khởi động | [JC-11 Thiết kế cơ sở dữ liệu](sprint-0-khoi-dong/JC-11-thiet-ke-co-so-du-lieu.md) |
 | Sprint 1 – Giao diện (V1) | [JC-18 Giao diện người dùng – Tài khoản](sprint-1-giao-dien-v1/JC-18-giao-dien-tai-khoan.md) |
 | Sprint 1 – Giao diện (V1) | [JC-24 Giao diện người dùng – Chat](sprint-1-giao-dien-v1/JC-24-giao-dien-chat.md) |
+| Sprint 1 – Giao diện (V1) | [JC-36 Giao diện phân hệ quản trị](sprint-1-giao-dien-v1/JC-36-giao-dien-phan-he-quan-tri.md) |
 | Sprint 2 – Lõi hệ thống | |
 | Sprint 3 – Xã hội và nhóm | |
 | Sprint 4 – Nâng cao (V2) | |

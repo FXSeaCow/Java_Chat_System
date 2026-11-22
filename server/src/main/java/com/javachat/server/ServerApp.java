@@ -2,6 +2,7 @@ package com.javachat.server;
 
 import com.javachat.server.database.ChatRepository;
 import com.javachat.server.database.AccountRepository;
+import com.javachat.server.database.AdminRepository;
 import com.javachat.server.database.DatabaseConfig;
 import com.javachat.shared.json.Json;
 import com.sun.net.httpserver.HttpExchange;
@@ -59,6 +60,12 @@ public final class ServerApp {
                 respond(exchange, 200, new ChatRepository(databaseConfig, userId).snapshot());
                 return;
             }
+            if ("GET".equals(method) && "/api/admin/snapshot".equals(path)) {
+                long adminId = authenticatedAdmin(exchange, accounts);
+                if (adminId < 0) return;
+                respond(exchange, 200, new AdminRepository(databaseConfig).snapshot());
+                return;
+            }
             if (!"POST".equals(method)) {
                 respond(exchange, 404, Map.of("error", "Unknown API endpoint"));
                 return;
@@ -76,8 +83,55 @@ public final class ServerApp {
             }
             if ("/api/auth/login".equals(path)) {
                 AccountRepository.LoginResult login = accounts.login(
-                        string(body, "login"), string(body, "password"));
+                        string(body, "login"), string(body, "password"),
+                        exchange.getRemoteAddress().getAddress().getHostAddress(),
+                        exchange.getRequestHeaders().getFirst("User-Agent"));
                 respond(exchange, 200, Map.of("token", login.token(), "userId", login.userId()));
+                return;
+            }
+            if ("/api/admin/auth/login".equals(path)) {
+                AccountRepository.LoginResult login = accounts.loginAdmin(
+                        string(body, "login"), string(body, "password"),
+                        exchange.getRemoteAddress().getAddress().getHostAddress(),
+                        exchange.getRequestHeaders().getFirst("User-Agent"));
+                respond(exchange, 200, Map.of("token", login.token(), "userId", login.userId()));
+                return;
+            }
+            if (path.startsWith("/api/admin/")) {
+                long adminId = authenticatedAdmin(exchange, accounts);
+                if (adminId < 0) return;
+                if ("/api/admin/auth/logout".equals(path)) {
+                    accounts.logout(bearerToken(exchange), adminId);
+                    respond(exchange, 200, Map.of("ok", true));
+                    return;
+                }
+                if ("/api/admin/reports/status".equals(path)) {
+                    new AdminRepository(databaseConfig).updateReport(
+                            number(body, "reportId"), adminId, string(body, "status"));
+                    respond(exchange, 200, Map.of("ok", true));
+                    return;
+                }
+                if ("/api/admin/users/status".equals(path)) {
+                    new AdminRepository(databaseConfig).updateUserStatus(
+                            number(body, "userId"), string(body, "status"));
+                    respond(exchange, 200, Map.of("ok", true));
+                    return;
+                }
+                if ("/api/admin/users/create".equals(path)) {
+                    long createdId = new AdminRepository(databaseConfig).createUser(
+                            string(body, "displayName"), string(body, "username"),
+                            string(body, "email"), string(body, "password"));
+                    respond(exchange, 201, Map.of("userId", createdId));
+                    return;
+                }
+                if ("/api/admin/users/update".equals(path)) {
+                    new AdminRepository(databaseConfig).updateUser(
+                            number(body, "userId"), string(body, "displayName"),
+                            string(body, "username"), string(body, "email"));
+                    respond(exchange, 200, Map.of("ok", true));
+                    return;
+                }
+                respond(exchange, 404, Map.of("error", "Unknown API endpoint"));
                 return;
             }
             long userId = authenticatedUser(exchange, accounts);
@@ -135,7 +189,7 @@ public final class ServerApp {
             System.err.println("Database error SQLSTATE " + error.getSQLState());
             respond(exchange, "23505".equals(error.getSQLState()) ? 409 : 500,
                     Map.of("error", "23505".equals(error.getSQLState())
-                            ? "Email đã được đăng ký." : "Database operation failed"));
+                            ? "Email hoặc tên đăng nhập đã được sử dụng." : "Database operation failed"));
         } catch (RuntimeException error) {
             System.err.println("API error: " + error.getClass().getSimpleName());
             respond(exchange, 500, Map.of("error", "Server operation failed"));
@@ -150,6 +204,14 @@ public final class ServerApp {
         long userId = token == null ? -1 : accounts.authenticatedUser(token);
         if (userId < 0) respond(exchange, 401, Map.of("error", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn."));
         return userId;
+    }
+
+    private static long authenticatedAdmin(HttpExchange exchange, AccountRepository accounts)
+            throws IOException, SQLException {
+        String token = bearerToken(exchange);
+        long adminId = token == null ? -1 : accounts.authenticatedAdmin(token);
+        if (adminId < 0) respond(exchange, 401, Map.of("error", "Cần đăng nhập bằng tài khoản quản trị."));
+        return adminId;
     }
 
     private static String bearerToken(HttpExchange exchange) {
