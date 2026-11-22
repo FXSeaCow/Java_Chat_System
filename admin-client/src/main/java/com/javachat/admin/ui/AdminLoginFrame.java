@@ -89,7 +89,7 @@ public final class AdminLoginFrame extends JFrame {
                     AdminApiClient api = new AdminApiClient();
                     api.login(username, new String(secret));
                     Map<String, Object> snapshot = api.snapshot();
-                    if (!snapshot.containsKey("loginHistory"))
+                    if (!snapshot.containsKey("users"))
                         throw new IOException("Server đang chạy bản cũ. Hãy khởi động lại run-server.ps1.");
                     return new Session(api, snapshot);
                 } finally { Arrays.fill(secret, '\0'); }

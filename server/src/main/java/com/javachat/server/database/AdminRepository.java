@@ -59,6 +59,15 @@ public final class AdminRepository {
                     FROM public.users WHERE role = 'USER' AND status <> 'DELETED'
                     ORDER BY created_at DESC LIMIT 500
                     """));
+            data.put("users", rows(connection, """
+                    SELECT u.id, u.display_name, u.username, u.email, u.status,
+                           u.created_at,
+                           (SELECT MAX(s.logged_in_at) FROM public.auth_sessions s
+                            WHERE s.user_id = u.id) AS last_login
+                    FROM public.users u
+                    WHERE u.role = 'USER' AND u.status IN ('ACTIVE', 'BLOCKED')
+                    ORDER BY u.created_at DESC LIMIT 500
+                    """));
             data.put("activeUsers", rows(connection, """
                     SELECT u.id, u.display_name, u.username,
                            MAX(s.logged_in_at) AS last_login,
@@ -101,6 +110,40 @@ public final class AdminRepository {
             statement.setLong(3, id);
             if (statement.executeUpdate() == 0)
                 throw new IllegalArgumentException("Báo cáo đã được xử lý hoặc không tồn tại.");
+        }
+    }
+
+    public void updateUserStatus(long userId, String status) throws SQLException {
+        if (!"ACTIVE".equals(status) && !"BLOCKED".equals(status))
+            throw new IllegalArgumentException("Trạng thái tài khoản không hợp lệ.");
+        try (Connection connection = config.openConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        UPDATE public.users SET status = ?
+                        WHERE id = ? AND role = 'USER' AND status IN ('ACTIVE', 'BLOCKED')
+                          AND status <> ?
+                        """)) {
+                    statement.setString(1, status);
+                    statement.setLong(2, userId);
+                    statement.setString(3, status);
+                    if (statement.executeUpdate() != 1)
+                        throw new IllegalArgumentException("Tài khoản không tồn tại hoặc trạng thái đã thay đổi.");
+                }
+                if ("BLOCKED".equals(status)) {
+                    try (PreparedStatement sessions = connection.prepareStatement("""
+                            UPDATE public.auth_sessions SET logged_out_at = CURRENT_TIMESTAMP(3)
+                            WHERE user_id = ? AND logged_out_at IS NULL
+                            """)) {
+                        sessions.setLong(1, userId);
+                        sessions.executeUpdate();
+                    }
+                }
+                connection.commit();
+            } catch (SQLException | RuntimeException error) {
+                connection.rollback();
+                throw error;
+            }
         }
     }
 

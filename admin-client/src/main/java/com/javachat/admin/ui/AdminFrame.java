@@ -143,6 +143,7 @@ public final class AdminFrame extends JFrame {
         addNav(menu, "history", "◷", "Lịch sử đăng nhập");
         addNav(menu, "groups", "▤", "Danh sách nhóm chat");
         addNav(menu, "reports", "⚑", "Báo cáo spam");
+        addNav(menu, "users", "◎", "Quản lý người dùng");
         addNav(menu, "new-users", "+", "Người dùng đăng ký mới");
         addNav(menu, "active-users", "◉", "Người dùng hoạt động");
         addNav(menu, "chart", "▥", "Biểu đồ đăng ký");
@@ -182,6 +183,7 @@ public final class AdminFrame extends JFrame {
         cards.add(new LoginHistoryPanel(AdminData.rows(snapshot, "loginHistory")), "history");
         cards.add(new GroupListPanel(AdminData.rows(snapshot, "groups")), "groups");
         cards.add(new SpamReportPanel(AdminData.rows(snapshot, "reports"), this::updateReport), "reports");
+        cards.add(new UserManagementPanel(AdminData.rows(snapshot, "users"), this::updateUserStatus), "users");
         cards.add(new NewUserPanel(AdminData.rows(snapshot, "newUsers")), "new-users");
         cards.add(new ActiveUserPanel(AdminData.rows(snapshot, "activeUsers")), "active-users");
         cards.add(new RegistrationChartPanel(AdminData.rows(snapshot, "registrationTrend")), "chart");
@@ -212,6 +214,20 @@ public final class AdminFrame extends JFrame {
         new SwingWorker<Void, Void>() {
             @Override protected Void doInBackground() throws Exception {
                 api.updateReport(reportId, status);
+                return null;
+            }
+            @Override protected void done() {
+                try { get(); refresh(); }
+                catch (InterruptedException error) { Thread.currentThread().interrupt(); }
+                catch (ExecutionException error) { showError(error.getCause()); }
+            }
+        }.execute();
+    }
+
+    private void updateUserStatus(long userId, String status) {
+        new SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() throws Exception {
+                api.updateUserStatus(userId, status);
                 return null;
             }
             @Override protected void done() {

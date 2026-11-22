@@ -5,8 +5,8 @@ the protocol types, DTOs, and models shared by the server and clients. Its Java
 package remains `com.javachat.shared` for compatibility with existing imports.
 The `server` module contains the local HTTP API and depends on
 `common`. The `admin-client` module contains the Swing admin dashboard with
-screens for login history, groups, spam reports, new users, active users,
-and registration statistics. The `user-client` module contains the chat UI: the
+screens for login history, groups, spam reports, user management, new users,
+active users, and registration statistics. The `user-client` module contains the chat UI: the
 main window and conversation list (JC-25), the chat frame (JC-26), history
 search (JC-27), the AI reply
 suggestion panel (JC-28), the friend list screen (JC-30), the friend request
@@ -24,9 +24,13 @@ powershell -ExecutionPolicy Bypass -File .\run-admin.ps1
 
 The admin client signs in through `/api/admin/auth/login` using a `public.users`
 account with `role = 'ADMIN'` and `status = 'ACTIVE'`. The server checks the
-session role on every admin request. All six screens load current Supabase data
+session role on every admin request. All seven screens load current Supabase data
 through `/api/admin/snapshot`; **Làm mới** reloads it. Reviewing or dismissing
-a pending spam report updates `public.reports` in Supabase.
+a pending spam report updates `public.reports` in Supabase. The **Quản lý người
+dùng** page searches and filters `USER` accounts, and can block or unblock a
+selected account. Blocking also ends all of that account's active sessions;
+unblocking does not restore old sessions. Admin accounts are excluded from
+these actions.
 The active-user screen shows accounts with unexpired login sessions; it is not
 a real-time presence feed. Admin lists return at most 500 recent rows per page.
 

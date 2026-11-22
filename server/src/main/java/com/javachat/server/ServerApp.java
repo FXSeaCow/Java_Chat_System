@@ -111,6 +111,12 @@ public final class ServerApp {
                     respond(exchange, 200, Map.of("ok", true));
                     return;
                 }
+                if ("/api/admin/users/status".equals(path)) {
+                    new AdminRepository(databaseConfig).updateUserStatus(
+                            number(body, "userId"), string(body, "status"));
+                    respond(exchange, 200, Map.of("ok", true));
+                    return;
+                }
                 respond(exchange, 404, Map.of("error", "Unknown API endpoint"));
                 return;
             }

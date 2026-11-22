@@ -114,3 +114,26 @@ luồng người dùng.
   admin sai thông tin trả HTTP 401.
 - Chưa kiểm thử luồng đăng nhập admin bằng tài khoản thật vì không có thông tin
   đăng nhập admin hợp lệ trong phiên làm việc; các tài khoản seed dùng hash cũ.
+
+## Thêm màn hình quản lý người dùng
+
+### Yêu cầu
+
+Thêm trang quản lý tài khoản người dùng trong phân hệ quản trị.
+
+### AI đã làm gì
+
+- Thêm mục điều hướng **Quản lý người dùng** cùng bảng tài khoản lấy từ Supabase.
+- Cho tìm theo họ tên, tên đăng nhập, email; lọc theo trạng thái hoạt động/bị khóa.
+- Thêm nút khóa và mở khóa tài khoản. API chỉ thay đổi tài khoản `USER`; khóa
+  tài khoản cũng kết thúc các phiên đăng nhập còn hiệu lực trong cùng transaction.
+- Thao tác chạy bất đồng bộ trên client, sau khi thành công tải lại snapshot để
+  phản ánh dữ liệu đã lưu. Cập nhật README cách dùng.
+
+### Kiểm tra
+
+- Biên dịch toàn bộ source Java thành công; `git diff --check` không báo lỗi.
+- Truy vấn snapshot chỉ đọc từ Supabase trả về 7 tài khoản cho trang mới.
+- Render headless trang mới và kiểm tra tìm kiếm, lọc trạng thái, ánh xạ nút
+  mở khóa tới đúng ID tài khoản.
+- Chưa thực hiện khóa/mở khóa trên dữ liệu thật trong lúc kiểm tra.

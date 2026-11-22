@@ -45,6 +45,10 @@ public final class AdminApiClient {
         request("POST", "/api/admin/reports/status", Map.of("reportId", reportId, "status", status));
     }
 
+    public void updateUserStatus(long userId, String status) throws IOException {
+        request("POST", "/api/admin/users/status", Map.of("userId", userId, "status", status));
+    }
+
     public void logout() throws IOException {
         try { request("POST", "/api/admin/auth/logout", Map.of()); }
         finally { token = null; }
