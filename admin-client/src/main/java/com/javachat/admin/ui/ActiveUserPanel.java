@@ -1,24 +1,23 @@
 package com.javachat.admin.ui;
 
-import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.table.TableRowSorter;
 import java.awt.BorderLayout;
+import java.util.List;
+import java.util.Map;
 
 final class ActiveUserPanel extends JPanel {
-    ActiveUserPanel() {
+    ActiveUserPanel(List<Map<String, Object>> users) {
         setLayout(new BorderLayout());
-        JTable table = AdminTheme.table(new Object[][] {
-                {"Nguyễn Minh Anh", "minhanh", "Trực tuyến", "2 phút trước", 32, 4},
-                {"Trần Gia Huy", "giahuy", "Trực tuyến", "5 phút trước", 18, 2},
-                {"Lê Hoàng Nam", "hoangnam", "Bận", "8 phút trước", 27, 5},
-                {"Nguyễn Thu Thảo", "thao.nguyen", "Trực tuyến", "12 phút trước", 14, 3},
-                {"Phạm Đức Long", "duclong", "Vắng mặt", "28 phút trước", 8, 1},
-                {"Đỗ Quốc Bảo", "quocbao", "Trực tuyến", "31 phút trước", 6, 2}
-        }, new Object[] {"Người dùng", "Tên đăng nhập", "Hiện diện", "Hoạt động cuối", "Tin nhắn hôm nay", "Phiên"});
+        JTable table = AdminTheme.table(AdminData.table(users, row -> new Object[] {
+                AdminData.text(row, "display_name"), AdminData.text(row, "username"),
+                "Đang đăng nhập", AdminData.time(row, "last_login"),
+                AdminData.number(row, "messages_today"), AdminData.number(row, "session_count")
+        }), new Object[] {"Người dùng", "Tên đăng nhập", "Phiên", "Đăng nhập gần nhất", "Tin nhắn hôm nay", "Số phiên"});
+        AdminTheme.columnWidths(table, 180, 155, 135, 155, 160, 80);
         TableRowSorter<?> sorter = new TableRowSorter<>(table.getModel());
         table.setRowSorter(sorter);
 
@@ -30,13 +29,10 @@ final class ActiveUserPanel extends JPanel {
         search.setToolTipText("Tìm người dùng đang hoạt động");
         LoginHistoryPanel.bindSearch(search, sorter);
         toolbar.add(search, BorderLayout.WEST);
-        JComboBox<String> presence = new JComboBox<>(new String[] {"Tất cả trạng thái", "Trực tuyến", "Bận", "Vắng mặt"});
-        presence.setFont(AdminTheme.BODY);
-        presence.getAccessibleContext().setAccessibleName("Lọc trạng thái hiện diện");
-        toolbar.add(presence, BorderLayout.EAST);
+        toolbar.add(AdminTheme.countBadge("Phiên còn hiệu lực", AdminTheme.SUCCESS), BorderLayout.EAST);
         surface.add(toolbar, BorderLayout.NORTH);
         surface.add(AdminTheme.scroll(table), BorderLayout.CENTER);
-        surface.add(new JLabel("6 người dùng hoạt động trong 30 phút gần nhất."), BorderLayout.SOUTH);
-        add(AdminTheme.page("Người dùng hoạt động", "Quan sát hiện diện và mức độ sử dụng gần đây theo thời gian thực.", surface));
+        surface.add(new JLabel(users.size() + " người dùng có phiên đăng nhập còn hiệu lực · Dữ liệu Supabase."), BorderLayout.SOUTH);
+        add(AdminTheme.page("Người dùng hoạt động", "Tài khoản có phiên đăng nhập còn hiệu lực; làm mới để cập nhật.", surface));
     }
 }

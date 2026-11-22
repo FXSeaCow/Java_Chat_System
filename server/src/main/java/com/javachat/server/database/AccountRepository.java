@@ -64,6 +64,23 @@ public final class AccountRepository {
     }
 
     public LoginResult login(String login, String password) throws SQLException {
+        return login(login, password, "USER", null, null);
+    }
+
+    public LoginResult loginAdmin(String login, String password) throws SQLException {
+        return login(login, password, "ADMIN", null, null);
+    }
+
+    public LoginResult login(String login, String password, String ipAddress, String deviceInfo) throws SQLException {
+        return login(login, password, "USER", ipAddress, deviceInfo);
+    }
+
+    public LoginResult loginAdmin(String login, String password, String ipAddress, String deviceInfo) throws SQLException {
+        return login(login, password, "ADMIN", ipAddress, deviceInfo);
+    }
+
+    private LoginResult login(String login, String password, String role,
+                              String ipAddress, String deviceInfo) throws SQLException {
         if (login == null || login.isBlank() || password == null || password.isEmpty())
             throw new AuthenticationException();
         try (Connection connection = config.openConnection()) {
@@ -74,10 +91,11 @@ public final class AccountRepository {
                 try (PreparedStatement statement = connection.prepareStatement("""
                         SELECT id, password_hash FROM public.users
                         WHERE (lower(email) = lower(?) OR lower(username) = lower(?))
-                          AND status = 'ACTIVE' AND role = 'USER' FOR UPDATE
+                          AND status = 'ACTIVE' AND role = ? FOR UPDATE
                         """)) {
                     statement.setString(1, login.strip());
                     statement.setString(2, login.strip());
+                    statement.setString(3, role);
                     try (ResultSet result = statement.executeQuery()) {
                         if (!result.next()) throw new AuthenticationException();
                         userId = result.getLong("id");
@@ -89,12 +107,14 @@ public final class AccountRepository {
                 new SecureRandom().nextBytes(tokenBytes);
                 String token = HexFormat.of().formatHex(tokenBytes);
                 try (PreparedStatement session = connection.prepareStatement("""
-                        INSERT INTO public.auth_sessions (user_id, token_hash, expires_at)
-                        VALUES (?, ?, ?)
+                        INSERT INTO public.auth_sessions (user_id, token_hash, expires_at, ip_address, device_info)
+                        VALUES (?, ?, ?, ?, ?)
                         """)) {
                     session.setLong(1, userId);
                     session.setString(2, sha256(token));
                     session.setTimestamp(3, Timestamp.from(Instant.now().plus(7, ChronoUnit.DAYS)));
+                    session.setString(4, ipAddress);
+                    session.setString(5, deviceInfo == null ? null : deviceInfo.substring(0, Math.min(500, deviceInfo.length())));
                     session.executeUpdate();
                 }
                 connection.commit();
@@ -107,6 +127,14 @@ public final class AccountRepository {
     }
 
     public long authenticatedUser(String token) throws SQLException {
+        return authenticated(token, "USER");
+    }
+
+    public long authenticatedAdmin(String token) throws SQLException {
+        return authenticated(token, "ADMIN");
+    }
+
+    private long authenticated(String token, String role) throws SQLException {
         if (token == null || !token.matches("[0-9a-f]{64}")) return -1;
         try (Connection connection = config.openConnection();
              PreparedStatement statement = connection.prepareStatement("""
@@ -114,9 +142,10 @@ public final class AccountRepository {
                      JOIN public.users u ON u.id = s.user_id
                      WHERE s.token_hash = ? AND s.logged_out_at IS NULL
                        AND s.expires_at > CURRENT_TIMESTAMP
-                       AND u.status = 'ACTIVE' AND u.role = 'USER'
+                       AND u.status = 'ACTIVE' AND u.role = ?
                      """)) {
             statement.setString(1, sha256(token));
+            statement.setString(2, role);
             try (ResultSet result = statement.executeQuery()) {
                 return result.next() ? result.getLong(1) : -1;
             }

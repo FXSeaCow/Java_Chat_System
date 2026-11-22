@@ -13,17 +13,18 @@ import javax.swing.event.DocumentListener;
 import javax.swing.table.TableRowSorter;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.util.List;
+import java.util.Map;
 
 final class LoginHistoryPanel extends JPanel {
-    LoginHistoryPanel() {
+    LoginHistoryPanel(List<Map<String, Object>> sessions) {
         setLayout(new BorderLayout());
-        JTable table = AdminTheme.table(new Object[][] {
-                {"Nguyễn Minh Anh", "minhanh@example.com", "Chrome · Windows", "113.161.44.21", "21/11/2026 09:42", "Đang hoạt động"},
-                {"Trần Gia Huy", "giahuy@example.com", "Java Client · Windows", "14.177.82.104", "21/11/2026 09:18", "Đã đăng xuất"},
-                {"Lê Hoàng Nam", "nam@example.com", "Safari · macOS", "42.118.91.18", "21/11/2026 08:51", "Đang hoạt động"},
-                {"Nguyễn Thu Thảo", "thao@example.com", "Java Client · Linux", "171.244.22.10", "20/11/2026 22:14", "Hết hạn"},
-                {"Phạm Đức Long", "long@example.com", "Chrome · Android", "27.72.118.33", "20/11/2026 20:07", "Đã đăng xuất"}
-        }, new Object[] {"Người dùng", "Email", "Thiết bị", "Địa chỉ IP", "Đăng nhập lúc", "Trạng thái"});
+        JTable table = AdminTheme.table(AdminData.table(sessions, row -> new Object[] {
+                AdminData.text(row, "display_name"), AdminData.text(row, "email"),
+                AdminData.text(row, "device_info"), AdminData.text(row, "ip_address"),
+                AdminData.time(row, "logged_in_at"), AdminData.text(row, "session_status")
+        }), new Object[] {"Người dùng", "Email", "Thiết bị", "Địa chỉ IP", "Đăng nhập lúc", "Trạng thái"});
+        AdminTheme.columnWidths(table, 145, 185, 175, 130, 165, 140);
         TableRowSorter<?> sorter = new TableRowSorter<>(table.getModel());
         table.setRowSorter(sorter);
 
@@ -33,15 +34,15 @@ final class LoginHistoryPanel extends JPanel {
         toolbar.setOpaque(false);
         JTextField search = AdminTheme.searchField("Tìm người dùng, email hoặc địa chỉ IP");
         search.setToolTipText("Tìm người dùng, email hoặc địa chỉ IP");
-        bindSearch(search, sorter);
         toolbar.add(search, BorderLayout.WEST);
-        JComboBox<String> period = new JComboBox<>(new String[] {"7 ngày gần đây", "30 ngày gần đây", "Tất cả"});
-        period.setFont(AdminTheme.BODY);
+        JComboBox<String> period = new JComboBox<>(new String[] {"Tất cả", "7 ngày gần đây", "30 ngày gần đây"});
+        AdminTheme.styleComboBox(period);
         period.getAccessibleContext().setAccessibleName("Khoảng thời gian");
+        AdminData.bindDateFilter(search, period, sorter, sessions, "logged_in_at");
         toolbar.add(period, BorderLayout.EAST);
         surface.add(toolbar, BorderLayout.NORTH);
         surface.add(AdminTheme.scroll(table), BorderLayout.CENTER);
-        surface.add(new JLabel("Hiển thị 5 phiên đăng nhập gần nhất · Dữ liệu mẫu giao diện"), BorderLayout.SOUTH);
+        surface.add(new JLabel("Hiển thị " + sessions.size() + " phiên đăng nhập gần nhất · Dữ liệu Supabase"), BorderLayout.SOUTH);
         add(AdminTheme.page("Lịch sử đăng nhập", "Theo dõi thiết bị, IP và thời điểm truy cập tài khoản.", surface));
     }
 

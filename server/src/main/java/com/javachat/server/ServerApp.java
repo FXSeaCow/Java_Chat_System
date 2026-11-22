@@ -2,6 +2,7 @@ package com.javachat.server;
 
 import com.javachat.server.database.ChatRepository;
 import com.javachat.server.database.AccountRepository;
+import com.javachat.server.database.AdminRepository;
 import com.javachat.server.database.DatabaseConfig;
 import com.javachat.shared.json.Json;
 import com.sun.net.httpserver.HttpExchange;
@@ -59,6 +60,12 @@ public final class ServerApp {
                 respond(exchange, 200, new ChatRepository(databaseConfig, userId).snapshot());
                 return;
             }
+            if ("GET".equals(method) && "/api/admin/snapshot".equals(path)) {
+                long adminId = authenticatedAdmin(exchange, accounts);
+                if (adminId < 0) return;
+                respond(exchange, 200, new AdminRepository(databaseConfig).snapshot());
+                return;
+            }
             if (!"POST".equals(method)) {
                 respond(exchange, 404, Map.of("error", "Unknown API endpoint"));
                 return;
@@ -76,8 +83,35 @@ public final class ServerApp {
             }
             if ("/api/auth/login".equals(path)) {
                 AccountRepository.LoginResult login = accounts.login(
-                        string(body, "login"), string(body, "password"));
+                        string(body, "login"), string(body, "password"),
+                        exchange.getRemoteAddress().getAddress().getHostAddress(),
+                        exchange.getRequestHeaders().getFirst("User-Agent"));
                 respond(exchange, 200, Map.of("token", login.token(), "userId", login.userId()));
+                return;
+            }
+            if ("/api/admin/auth/login".equals(path)) {
+                AccountRepository.LoginResult login = accounts.loginAdmin(
+                        string(body, "login"), string(body, "password"),
+                        exchange.getRemoteAddress().getAddress().getHostAddress(),
+                        exchange.getRequestHeaders().getFirst("User-Agent"));
+                respond(exchange, 200, Map.of("token", login.token(), "userId", login.userId()));
+                return;
+            }
+            if (path.startsWith("/api/admin/")) {
+                long adminId = authenticatedAdmin(exchange, accounts);
+                if (adminId < 0) return;
+                if ("/api/admin/auth/logout".equals(path)) {
+                    accounts.logout(bearerToken(exchange), adminId);
+                    respond(exchange, 200, Map.of("ok", true));
+                    return;
+                }
+                if ("/api/admin/reports/status".equals(path)) {
+                    new AdminRepository(databaseConfig).updateReport(
+                            number(body, "reportId"), adminId, string(body, "status"));
+                    respond(exchange, 200, Map.of("ok", true));
+                    return;
+                }
+                respond(exchange, 404, Map.of("error", "Unknown API endpoint"));
                 return;
             }
             long userId = authenticatedUser(exchange, accounts);
@@ -150,6 +184,14 @@ public final class ServerApp {
         long userId = token == null ? -1 : accounts.authenticatedUser(token);
         if (userId < 0) respond(exchange, 401, Map.of("error", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn."));
         return userId;
+    }
+
+    private static long authenticatedAdmin(HttpExchange exchange, AccountRepository accounts)
+            throws IOException, SQLException {
+        String token = bearerToken(exchange);
+        long adminId = token == null ? -1 : accounts.authenticatedAdmin(token);
+        if (adminId < 0) respond(exchange, 401, Map.of("error", "Cần đăng nhập bằng tài khoản quản trị."));
+        return adminId;
     }
 
     private static String bearerToken(HttpExchange exchange) {

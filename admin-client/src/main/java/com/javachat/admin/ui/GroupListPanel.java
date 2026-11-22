@@ -9,17 +9,18 @@ import javax.swing.JTextField;
 import javax.swing.table.TableRowSorter;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
+import java.util.List;
+import java.util.Map;
 
 final class GroupListPanel extends JPanel {
-    GroupListPanel() {
+    GroupListPanel(List<Map<String, Object>> groups) {
         setLayout(new BorderLayout());
-        JTable table = AdminTheme.table(new Object[][] {
-                {"Nhóm Java Chat", "Nguyễn Minh Anh", 18, 326, "21/11/2026 09:35", "Hoạt động"},
-                {"Đồ án Công nghệ phần mềm", "Trần Gia Huy", 9, 184, "21/11/2026 08:12", "Hoạt động"},
-                {"Cộng đồng Swing Việt Nam", "Lê Hoàng Nam", 42, 905, "20/11/2026 23:01", "Hoạt động"},
-                {"Team Backend", "Nguyễn Thu Thảo", 6, 76, "19/11/2026 17:45", "Ít hoạt động"},
-                {"Test Group 01", "Phạm Đức Long", 2, 3, "12/11/2026 10:20", "Ít hoạt động"}
-        }, new Object[] {"Tên nhóm", "Chủ nhóm", "Thành viên", "Tin nhắn", "Hoạt động cuối", "Trạng thái"});
+        JTable table = AdminTheme.table(AdminData.table(groups, row -> new Object[] {
+                AdminData.text(row, "name"), AdminData.text(row, "owner_name"),
+                AdminData.number(row, "member_count"), AdminData.number(row, "message_count"),
+                AdminData.time(row, "updated_at"), AdminData.text(row, "description")
+        }), new Object[] {"Tên nhóm", "Chủ nhóm", "Thành viên", "Tin nhắn", "Hoạt động cuối", "Mô tả"});
+        AdminTheme.columnWidths(table, 250, 170, 100, 95, 175, 210);
         TableRowSorter<?> sorter = new TableRowSorter<>(table.getModel());
         table.setRowSorter(sorter);
 
@@ -33,14 +34,14 @@ final class GroupListPanel extends JPanel {
         toolbar.add(search, BorderLayout.WEST);
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
-        actions.add(AdminTheme.countBadge("5 nhóm", AdminTheme.PRIMARY));
+        actions.add(AdminTheme.countBadge(groups.size() + " nhóm", AdminTheme.PRIMARY));
         JButton details = AdminTheme.button("Xem chi tiết", false);
         details.addActionListener(event -> showSelection(table));
         actions.add(details);
         toolbar.add(actions, BorderLayout.EAST);
         surface.add(toolbar, BorderLayout.NORTH);
         surface.add(AdminTheme.scroll(table), BorderLayout.CENTER);
-        surface.add(new JLabel("Chọn một nhóm để xem thông tin quản trị chi tiết."), BorderLayout.SOUTH);
+        surface.add(new JLabel("Chọn một nhóm để xem thông tin quản trị chi tiết · Dữ liệu Supabase."), BorderLayout.SOUTH);
         add(AdminTheme.page("Danh sách nhóm chat", "Kiểm tra quy mô, chủ sở hữu và mức độ hoạt động của nhóm.", surface));
     }
 

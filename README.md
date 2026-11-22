@@ -5,8 +5,8 @@ the protocol types, DTOs, and models shared by the server and clients. Its Java
 package remains `com.javachat.shared` for compatibility with existing imports.
 The `server` module contains the local HTTP API and depends on
 `common`. The `admin-client` module contains the Swing admin dashboard with
-screens for login history, groups, spam reports, new users, active users, and
-registration statistics. The `user-client` module contains the chat UI: the
+screens for login history, groups, spam reports, new users, active users,
+and registration statistics. The `user-client` module contains the chat UI: the
 main window and conversation list (JC-25), the chat frame (JC-26), history
 search (JC-27), the AI reply
 suggestion panel (JC-28), the friend list screen (JC-30), the friend request
@@ -15,14 +15,35 @@ screen (JC-22).
 
 Build all modules from the repository root with `mvn verify`.
 
-To preview the admin dashboard on Windows, run this from the repository root:
+To open the live admin dashboard on Windows, start the server first, then run
+this in another terminal from the repository root:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\run-admin.ps1
 ```
 
-The admin screens currently use sample rows and do not query Supabase. They
-do not have admin sign-in or database write actions yet.
+The admin client signs in through `/api/admin/auth/login` using a `public.users`
+account with `role = 'ADMIN'` and `status = 'ACTIVE'`. The server checks the
+session role on every admin request. All six screens load current Supabase data
+through `/api/admin/snapshot`; **Làm mới** reloads it. Reviewing or dismissing
+a pending spam report updates `public.reports` in Supabase.
+The active-user screen shows accounts with unexpired login sessions; it is not
+a real-time presence feed. Admin lists return at most 500 recent rows per page.
+
+The seed admin accounts have legacy password hashes that cannot be used with
+the current live login. To create an admin account, register a new account in
+the live user client, then promote that specific account in the Supabase SQL
+Editor (replace the email with the registered email):
+
+```sql
+UPDATE public.users SET role = 'ADMIN'
+WHERE email = 'your-registered-email@example.com' AND status = 'ACTIVE';
+```
+
+Sign in to the admin client with that email and its password. The promoted
+account is reserved for admin sign-in; keep a separate `USER` account for chat.
+Database credentials remain on the server and are never stored in the admin
+client. `JAVA_CHAT_API_URL` also controls the admin client's loopback API URL.
 
 Copy `config.properties.example` to `config.properties` and enter the host,
 port, username, and password shown in Supabase Dashboard > Connect. Use the

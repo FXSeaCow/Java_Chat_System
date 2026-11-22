@@ -16,24 +16,26 @@ import java.awt.GridLayout;
 import java.awt.RenderingHints;
 import java.awt.geom.Path2D;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 final class RegistrationChartPanel extends JPanel {
-    RegistrationChartPanel() {
+    RegistrationChartPanel(List<Map<String, Object>> trend) {
         setLayout(new BorderLayout());
-        int[] registrations = {12, 18, 15, 24, 31, 28, 42, 38, 46, 52, 49, 61, 58, 72};
-        int[] activeUsers = {184, 205, 198, 232, 276, 261, 310, 294, 338, 365, 352, 401, 389, 438};
-        String[] labels = {"08/11", "09/11", "10/11", "11/11", "12/11", "13/11", "14/11",
-                "15/11", "16/11", "17/11", "18/11", "19/11", "20/11", "21/11"};
+        int[] registrations = trend.stream().mapToInt(row -> (int) AdminData.number(row, "registrations")).toArray();
+        int[] logins = trend.stream().mapToInt(row -> (int) AdminData.number(row, "logins")).toArray();
+        String[] labels = trend.stream().map(AdminData::day).toArray(String[]::new);
 
         JPanel surface = AdminTheme.surface();
         surface.setLayout(new BorderLayout(0, 16));
         JPanel summary = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         summary.setOpaque(false);
-        summary.add(AdminTheme.countBadge("546 đăng ký", AdminTheme.PRIMARY));
-        summary.add(AdminTheme.countBadge("438 người hoạt động", AdminTheme.SUCCESS));
-        summary.add(AdminTheme.countBadge("+18,4% so với kỳ trước", AdminTheme.SUCCESS));
+        JLabel registrationBadge = AdminTheme.countBadge("0 đăng ký", AdminTheme.PRIMARY);
+        JLabel loginBadge = AdminTheme.countBadge("0 lượt đăng nhập", AdminTheme.SUCCESS);
+        summary.add(registrationBadge);
+        summary.add(loginBadge);
         JComboBox<String> period = new JComboBox<>(new String[] {"14 ngày", "30 ngày", "90 ngày"});
-        period.setFont(AdminTheme.BODY);
+        AdminTheme.styleComboBox(period);
         period.getAccessibleContext().setAccessibleName("Khoảng thời gian biểu đồ");
         summary.add(period);
         surface.add(summary, BorderLayout.NORTH);
@@ -42,20 +44,48 @@ final class RegistrationChartPanel extends JPanel {
         visualization.setOpaque(false);
         JPanel charts = new JPanel(new GridLayout(1, 2, 16, 0));
         charts.setOpaque(false);
-        charts.add(new LineChart("Đăng ký mới", labels, registrations, 80, AdminTheme.PRIMARY,
-                "Tăng từ 12 lượt ngày 08 tháng 11 lên 72 lượt ngày 21 tháng 11."));
-        charts.add(new LineChart("Người dùng hoạt động", labels, activeUsers, 500, AdminTheme.SUCCESS,
-                "Tăng từ 184 người ngày 08 tháng 11 lên 438 người ngày 21 tháng 11."));
         visualization.add(charts, BorderLayout.CENTER);
-        JTable data = AdminTheme.table(new Object[][] {
-                {"08–14/11", 140, 310, "—"},
-                {"15–21/11", 376, 438, "+18,4% hoạt động"}
-        }, new Object[] {"Giai đoạn", "Đăng ký mới", "Hoạt động cuối kỳ", "Thay đổi"});
+        JTable data = AdminTheme.table(new Object[0][0], new Object[0]);
+        javax.swing.table.DefaultTableModel dataModel = new javax.swing.table.DefaultTableModel(
+                new Object[][] {{"—", 0, 0}},
+                new Object[] {"Giai đoạn", "Đăng ký mới", "Lượt đăng nhập"}) {
+            @Override public boolean isCellEditable(int row, int column) { return false; }
+        };
+        data.setModel(dataModel);
+        AdminTheme.columnWidths(data, 190, 175, 195);
         data.setPreferredScrollableViewportSize(new Dimension(700, 88));
         visualization.add(AdminTheme.scroll(data), BorderLayout.SOUTH);
         surface.add(visualization, BorderLayout.CENTER);
-        surface.add(new JLabel("Ngày 21/11 đạt 72 đăng ký mới và 438 người dùng hoạt động, cao nhất kỳ."), BorderLayout.SOUTH);
-        add(AdminTheme.page("Đăng ký mới và hoạt động", "So sánh hai xu hướng bằng biểu đồ tách thang đo và bảng dữ liệu.", surface));
+        JLabel note = new JLabel("Dữ liệu Supabase · Thống kê theo ngày.");
+        surface.add(note, BorderLayout.SOUTH);
+        Runnable refresh = () -> {
+            int days = switch (period.getSelectedIndex()) { case 1 -> 30; case 2 -> 90; default -> 14; };
+            int start = Math.max(0, labels.length - days);
+            String[] shownLabels = Arrays.copyOfRange(labels, start, labels.length);
+            int[] shownRegistrations = Arrays.copyOfRange(registrations, start, registrations.length);
+            int[] shownLogins = Arrays.copyOfRange(logins, start, logins.length);
+            int registrationTotal = Arrays.stream(shownRegistrations).sum();
+            int loginTotal = Arrays.stream(shownLogins).sum();
+            registrationBadge.setText(registrationTotal + " đăng ký");
+            loginBadge.setText(loginTotal + " lượt đăng nhập");
+            charts.removeAll();
+            charts.add(new LineChart("Đăng ký mới", shownLabels, shownRegistrations,
+                    Math.max(4, Arrays.stream(shownRegistrations).max().orElse(0)), AdminTheme.PRIMARY,
+                    "Số tài khoản mới theo ngày."));
+            charts.add(new LineChart("Lượt đăng nhập", shownLabels, shownLogins,
+                    Math.max(4, Arrays.stream(shownLogins).max().orElse(0)), AdminTheme.SUCCESS,
+                    "Số tài khoản đăng nhập theo ngày."));
+            dataModel.setDataVector(new Object[][] {
+                    {shownLabels.length == 0 ? "—" : shownLabels[0] + "–" + shownLabels[shownLabels.length - 1],
+                            registrationTotal, loginTotal}
+            }, new Object[] {"Giai đoạn", "Đăng ký mới", "Lượt đăng nhập"});
+            AdminTheme.columnWidths(data, 190, 175, 195);
+            charts.revalidate();
+            charts.repaint();
+        };
+        period.addActionListener(event -> refresh.run());
+        refresh.run();
+        add(AdminTheme.page("Đăng ký mới và đăng nhập", "So sánh số tài khoản mới và lượt đăng nhập theo ngày.", surface));
     }
 
     private static final class LineChart extends JPanel {
@@ -89,9 +119,9 @@ final class RegistrationChartPanel extends JPanel {
             g.setFont(AdminTheme.BODY);
             g.setColor(AdminTheme.TEXT);
             g.drawString(title, left, 16);
-            int step = max / 4;
-            for (int tick = 0; tick <= max; tick += step) {
-                int y = top + height - tick * height / max;
+            for (int index = 0; index <= 4; index++) {
+                int tick = index * max / 4;
+                int y = top + height - index * height / 4;
                 g.setColor(AdminTheme.BORDER);
                 g.drawLine(left, y, left + width, y);
                 g.setColor(AdminTheme.MUTED);
@@ -100,7 +130,7 @@ final class RegistrationChartPanel extends JPanel {
 
             Path2D line = new Path2D.Double();
             for (int i = 0; i < values.length; i++) {
-                double x = left + i * (width / (double) (values.length - 1));
+                double x = left + i * (width / (double) Math.max(1, values.length - 1));
                 double y = top + height - values[i] * (height / (double) max);
                 if (i == 0) line.moveTo(x, y); else line.lineTo(x, y);
             }
@@ -108,14 +138,14 @@ final class RegistrationChartPanel extends JPanel {
             g.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g.draw(line);
             for (int i = 0; i < values.length; i++) {
-                int x = left + (int) Math.round(i * (width / (double) (values.length - 1)));
+                int x = left + (int) Math.round(i * (width / (double) Math.max(1, values.length - 1)));
                 int y = top + height - values[i] * height / max;
                 g.setColor(Color.WHITE);
                 g.fillOval(x - 5, y - 5, 10, 10);
                 g.setColor(lineColor);
                 g.setStroke(new BasicStroke(2));
                 g.drawOval(x - 5, y - 5, 10, 10);
-                if (i % 2 == 0 || i == values.length - 1) {
+                if (i % Math.max(1, values.length / 7) == 0 || i == values.length - 1) {
                     String label = labels[i];
                     g.setColor(AdminTheme.MUTED);
                     g.drawString(label, x - metrics.stringWidth(label) / 2, top + height + 25);
