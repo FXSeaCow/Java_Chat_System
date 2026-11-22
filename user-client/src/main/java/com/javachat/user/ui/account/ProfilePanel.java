@@ -1,6 +1,7 @@
 package com.javachat.user.ui.account;
 
 import com.javachat.shared.dto.AuthDtos.ProfileUpdateRequest;
+import com.javachat.shared.dto.AuthDtos.ChangePasswordRequest;
 import com.javachat.shared.model.Gender;
 import com.javachat.shared.model.User;
 import com.javachat.user.ui.chat.ChatTheme;
@@ -77,9 +78,15 @@ public final class ProfilePanel extends JPanel {
     private final JLabel status = new JLabel(" ");
     private final JButton reset = secondary("Hoàn tác");
     private final JButton save = primary("Lưu thay đổi");
+    private final JButton changePassword = secondary("Đổi mật khẩu");
+    private final JButton logout = new AccountButton("Đăng xuất", AccountButton.Style.DANGER);
     private Consumer<ProfileUpdateRequest> updateListener = ignored -> { };
+    private Consumer<ChangePasswordRequest> passwordChangeListener = ignored -> { };
+    private Runnable logoutListener = () -> { };
+    private PasswordChangeDialog passwordDialog;
     private User user;
     private boolean saving;
+    private boolean loggingOut;
 
     public ProfilePanel() {
         super(new BorderLayout());
@@ -114,6 +121,8 @@ public final class ProfilePanel extends JPanel {
         });
         reset.addActionListener(event -> fill(user));
         save.addActionListener(event -> submit());
+        changePassword.addActionListener(event -> showPasswordDialog());
+        logout.addActionListener(event -> logoutListener.run());
         updateButtons();
     }
 
@@ -135,6 +144,37 @@ public final class ProfilePanel extends JPanel {
 
     public void setUpdateListener(Consumer<ProfileUpdateRequest> listener) {
         updateListener = listener == null ? ignored -> { } : listener;
+    }
+
+    public void setLogoutListener(Runnable listener) {
+        logoutListener = listener == null ? () -> { } : listener;
+    }
+
+    public void setPasswordChangeListener(Consumer<ChangePasswordRequest> listener) {
+        passwordChangeListener = listener == null ? ignored -> { } : listener;
+    }
+
+    public void setPasswordChangeFailed(String message) {
+        if (passwordDialog != null && passwordDialog.isDisplayable()) passwordDialog.showError(message);
+    }
+
+    public void setPasswordChangeSucceeded() {
+        if (passwordDialog != null) passwordDialog.dispose();
+    }
+
+    public void setLogoutPending(boolean pending) {
+        loggingOut = pending;
+        logout.setEnabled(!pending);
+        changePassword.setEnabled(!pending && user != null);
+        logout.setText(pending ? "Đang đăng xuất..." : "Đăng xuất");
+    }
+
+    private void showPasswordDialog() {
+        if (user == null || loggingOut) return;
+        passwordDialog = new PasswordChangeDialog(SwingUtilities.getWindowAncestor(this),
+                passwordChangeListener);
+        passwordDialog.setVisible(true);
+        passwordDialog = null;
     }
 
     /** Call after the server accepted the update; the returned user becomes the new baseline. */
@@ -253,16 +293,18 @@ public final class ProfilePanel extends JPanel {
     }
 
     private JPanel footer() {
-        JPanel footer = new JPanel(new BorderLayout(12, 0));
+        JPanel footer = new JPanel(new BorderLayout(0, 8));
         footer.setOpaque(false);
         footer.setBorder(BorderFactory.createEmptyBorder(14, 0, 0, 0));
         status.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
-        footer.add(status, BorderLayout.CENTER);
+        footer.add(status, BorderLayout.NORTH);
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         buttons.setOpaque(false);
+        buttons.add(changePassword);
+        buttons.add(logout);
         buttons.add(reset);
         buttons.add(save);
-        footer.add(buttons, BorderLayout.EAST);
+        footer.add(buttons, BorderLayout.CENTER);
         return footer;
     }
 
@@ -299,6 +341,7 @@ public final class ProfilePanel extends JPanel {
         boolean dirty = enabled && isDirty();
         save.setEnabled(dirty);
         reset.setEnabled(dirty);
+        changePassword.setEnabled(user != null && !loggingOut);
         save.setText(saving ? "Đang lưu..." : "Lưu thay đổi");
     }
 
@@ -451,24 +494,11 @@ public final class ProfilePanel extends JPanel {
     }
 
     private static JButton primary(String text) {
-        JButton button = new JButton(text);
-        button.setForeground(Color.WHITE);
-        button.setBackground(ChatTheme.TEAL);
-        button.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 13));
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
-        return button;
+        return new AccountButton(text, AccountButton.Style.PRIMARY);
     }
 
     private static JButton secondary(String text) {
-        JButton button = new JButton(text);
-        button.setForeground(INK);
-        button.setBackground(Color.WHITE);
-        button.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 13));
-        button.setFocusPainted(false);
-        button.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(BORDER),
-                BorderFactory.createEmptyBorder(9, 18, 9, 18)));
-        return button;
+        return new AccountButton(text, AccountButton.Style.SECONDARY);
     }
 
     private enum GenderChoice {

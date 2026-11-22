@@ -42,6 +42,8 @@ import java.awt.geom.Arc2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 /** Warm, mascot-led authentication window for the desktop client. */
 public final class LoginFrame extends JFrame {
@@ -62,6 +64,8 @@ public final class LoginFrame extends JFrame {
     private static final int AUTH_CARD_FORGOT_HEIGHT = 230;
 
     private final Runnable onAuthenticated;
+    private final LoginHandler loginHandler;
+    private final RegistrationHandler registrationHandler;
     private final JTextField loginField = new RoundedTextField("you@example.com");
     private final JPasswordField passwordField = new RoundedPasswordField();
     private final JLabel loginError = errorLabel();
@@ -89,9 +93,22 @@ public final class LoginFrame extends JFrame {
     private boolean signUpMode;
     private boolean forgotPasswordMode;
 
-    public LoginFrame(Runnable onAuthenticated) {
+    @FunctionalInterface
+    public interface LoginHandler {
+        void login(String login, String password) throws Exception;
+    }
+
+    @FunctionalInterface
+    public interface RegistrationHandler {
+        long register(String displayName, String email, String password) throws Exception;
+    }
+
+    public LoginFrame(Runnable onAuthenticated, LoginHandler loginHandler,
+                      RegistrationHandler registrationHandler) {
         super("Java Chat - Đăng nhập");
         this.onAuthenticated = Objects.requireNonNull(onAuthenticated);
+        this.loginHandler = loginHandler;
+        this.registrationHandler = registrationHandler;
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         Rectangle usableScreen = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
         int windowWidth = Math.min(1_040, Math.max(840, (int) (usableScreen.width * 0.88)));
@@ -420,13 +437,29 @@ public final class LoginFrame extends JFrame {
         submitButton.setEnabled(false);
         submitButton.setText(signUpMode ? "Đang tạo tài khoản..." : "Đang đăng nhập...");
         setStatus("Đang kết nối an toàn...", false);
-        Timer timer = new Timer(450, event -> {
-            ((Timer) event.getSource()).stop();
+        if (loginHandler == null) {
             dispose();
             onAuthenticated.run();
-        });
-        timer.setRepeats(false);
-        timer.start();
+            return;
+        }
+        CompletableFuture.runAsync(() -> {
+            try {
+                loginHandler.login(login, password);
+            } catch (Exception error) {
+                throw new CompletionException(error);
+            }
+        }).whenComplete((ignored, error) -> javax.swing.SwingUtilities.invokeLater(() -> {
+            if (error != null) {
+                submitButton.setEnabled(true);
+                submitButton.setText("Đăng nhập");
+                Throwable cause = error.getCause() == null ? error : error.getCause();
+                setStatus("Đăng nhập thất bại: " + cause.getMessage(), true);
+                return;
+            }
+            passwordField.setText("");
+            dispose();
+            onAuthenticated.run();
+        }));
     }
 
     private void submitForgotPassword() {
@@ -486,16 +519,34 @@ public final class LoginFrame extends JFrame {
         }
         if (!valid) return;
 
+        if (registrationHandler == null) {
+            setStatus("Chế độ demo không lưu tài khoản. Hãy chạy server và client live.", true);
+            return;
+        }
+
         submitButton.setEnabled(false);
         submitButton.setText("Đang tạo tài khoản...");
-        setStatus("Đang thiết lập tài khoản an toàn...", false);
-        Timer timer = new Timer(500, event -> {
-            ((Timer) event.getSource()).stop();
-            dispose();
-            onAuthenticated.run();
-        });
-        timer.setRepeats(false);
-        timer.start();
+        setStatus("Đang lưu tài khoản vào database...", false);
+        CompletableFuture.supplyAsync(() -> {
+            try {
+                return registrationHandler.register(fullName, email, password);
+            } catch (Exception error) {
+                throw new CompletionException(error);
+            }
+        }).whenComplete((userId, error) -> javax.swing.SwingUtilities.invokeLater(() -> {
+            if (error != null) {
+                submitButton.setEnabled(true);
+                submitButton.setText("Tạo tài khoản");
+                Throwable cause = error.getCause() == null ? error : error.getCause();
+                setStatus("Không tạo được tài khoản: " + cause.getMessage(), true);
+                return;
+            }
+            registrationPasswordField.setText("");
+            confirmPasswordField.setText("");
+            loginField.setText(email);
+            setMode(false);
+            setStatus("Đã lưu tài khoản (ID " + userId + "). Hãy đăng nhập.", false);
+        }));
     }
 
     private void clearErrors() {

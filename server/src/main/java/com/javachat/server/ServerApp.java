@@ -1,6 +1,7 @@
 package com.javachat.server;
 
 import com.javachat.server.database.ChatRepository;
+import com.javachat.server.database.AccountRepository;
 import com.javachat.server.database.DatabaseConfig;
 import com.javachat.shared.json.Json;
 import com.sun.net.httpserver.HttpExchange;
@@ -19,7 +20,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 
-/** Loopback-only API for the desktop client while account authentication is pending. */
+/** Loopback-only authenticated API for the desktop client. */
 public final class ServerApp {
     private ServerApp() { }
 
@@ -32,26 +33,30 @@ public final class ServerApp {
             }
         }
         String host = settings.getProperty("server.host", "127.0.0.1").trim();
-        int port = Integer.parseInt(settings.getProperty("server.port", "8080").trim());
-        long userId = Long.parseLong(settings.getProperty("server.user_id", "1").trim());
+        int port = Integer.parseInt(System.getenv().getOrDefault(
+                "JAVA_CHAT_SERVER_PORT", settings.getProperty("server.port", "8080")).trim());
         InetAddress address = InetAddress.getByName(host);
         if (!address.isLoopbackAddress()) {
-            throw new IllegalArgumentException("Unauthenticated development API must bind to loopback");
+            throw new IllegalArgumentException("Desktop API must bind to loopback");
         }
-        ChatRepository repository = new ChatRepository(DatabaseConfig.load(), userId);
+        DatabaseConfig databaseConfig = DatabaseConfig.load();
+        AccountRepository accounts = new AccountRepository(databaseConfig);
         HttpServer server = HttpServer.create(new InetSocketAddress(address, port), 0);
-        server.createContext("/api/", exchange -> handle(exchange, repository));
+        server.createContext("/api/", exchange -> handle(exchange, databaseConfig, accounts));
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         System.out.println("E-Chat API listening at http://" + host + ":" + server.getAddress().getPort());
     }
 
-    private static void handle(HttpExchange exchange, ChatRepository repository) throws IOException {
+    private static void handle(HttpExchange exchange, DatabaseConfig databaseConfig,
+                               AccountRepository accounts) throws IOException {
         try {
             String path = exchange.getRequestURI().getPath();
             String method = exchange.getRequestMethod();
             if ("GET".equals(method) && "/api/snapshot".equals(path)) {
-                respond(exchange, 200, repository.snapshot());
+                long userId = authenticatedUser(exchange, accounts);
+                if (userId < 0) return;
+                respond(exchange, 200, new ChatRepository(databaseConfig, userId).snapshot());
                 return;
             }
             if (!"POST".equals(method)) {
@@ -64,6 +69,31 @@ public final class ServerApp {
                 return;
             }
             Map<String, Object> body = Json.object(Json.parse(new String(bytes, StandardCharsets.UTF_8)));
+            if ("/api/auth/register".equals(path)) {
+                respond(exchange, 201, Map.of("userId", accounts.register(
+                        string(body, "displayName"), string(body, "email"), string(body, "password"))));
+                return;
+            }
+            if ("/api/auth/login".equals(path)) {
+                AccountRepository.LoginResult login = accounts.login(
+                        string(body, "login"), string(body, "password"));
+                respond(exchange, 200, Map.of("token", login.token(), "userId", login.userId()));
+                return;
+            }
+            long userId = authenticatedUser(exchange, accounts);
+            if (userId < 0) return;
+            if ("/api/auth/logout".equals(path)) {
+                accounts.logout(bearerToken(exchange), userId);
+                respond(exchange, 200, Map.of("ok", true));
+                return;
+            }
+            if ("/api/auth/change-password".equals(path)) {
+                accounts.changePassword(userId, string(body, "currentPassword"),
+                        string(body, "newPassword"));
+                respond(exchange, 200, Map.of("ok", true));
+                return;
+            }
+            ChatRepository repository = new ChatRepository(databaseConfig, userId);
             switch (path) {
                 case "/api/messages" -> respond(exchange, 200, Map.of("id",
                         repository.sendMessage(number(body, "conversationId"),
@@ -97,18 +127,34 @@ public final class ServerApp {
                 }
                 default -> respond(exchange, 404, Map.of("error", "Unknown API endpoint"));
             }
+        } catch (AccountRepository.AuthenticationException error) {
+            respond(exchange, 401, Map.of("error", error.getMessage()));
         } catch (IllegalArgumentException error) {
             respond(exchange, 400, Map.of("error", error.getMessage()));
         } catch (SQLException error) {
             System.err.println("Database error SQLSTATE " + error.getSQLState());
             respond(exchange, "23505".equals(error.getSQLState()) ? 409 : 500,
-                    Map.of("error", "Database operation failed"));
+                    Map.of("error", "23505".equals(error.getSQLState())
+                            ? "Email đã được đăng ký." : "Database operation failed"));
         } catch (RuntimeException error) {
             System.err.println("API error: " + error.getClass().getSimpleName());
             respond(exchange, 500, Map.of("error", "Server operation failed"));
         } finally {
             exchange.close();
         }
+    }
+
+    private static long authenticatedUser(HttpExchange exchange, AccountRepository accounts)
+            throws IOException, SQLException {
+        String token = bearerToken(exchange);
+        long userId = token == null ? -1 : accounts.authenticatedUser(token);
+        if (userId < 0) respond(exchange, 401, Map.of("error", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn."));
+        return userId;
+    }
+
+    private static String bearerToken(HttpExchange exchange) {
+        String header = exchange.getRequestHeaders().getFirst("Authorization");
+        return header != null && header.startsWith("Bearer ") ? header.substring(7) : null;
     }
 
     private static long number(Map<String, Object> body, String key) {

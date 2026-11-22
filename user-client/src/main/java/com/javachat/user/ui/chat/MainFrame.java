@@ -22,6 +22,7 @@ import com.javachat.shared.dto.GroupDtos.MemberRoleUpdateRequest;
 import com.javachat.shared.model.ConversationMember;
 import com.javachat.shared.model.GroupDetails;
 import com.javachat.shared.dto.AuthDtos.ProfileUpdateRequest;
+import com.javachat.shared.dto.AuthDtos.ChangePasswordRequest;
 import com.javachat.user.ui.account.ProfilePanel;
 
 import javax.swing.Box;
@@ -220,17 +221,47 @@ public final class MainFrame extends JFrame {
     }
 
     private static JButton windowButton(String symbol, String tooltip) {
-        JButton button = new JButton(symbol);
+        JButton button = new WindowControlButton(symbol, "Đóng ứng dụng".equals(tooltip));
         button.setPreferredSize(new Dimension(38, 36));
         button.setToolTipText(tooltip);
         button.getAccessibleContext().setAccessibleName(tooltip);
-        button.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 21));
-        button.setForeground(INK);
-        button.setContentAreaFilled(false);
-        button.setBorder(null);
-        button.setFocusPainted(false);
-        button.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
         return button;
+    }
+
+    private static final class WindowControlButton extends JButton {
+        private final boolean close;
+
+        WindowControlButton(String symbol, boolean close) {
+            super(symbol);
+            this.close = close;
+            setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 21));
+            setOpaque(false);
+            setContentAreaFilled(false);
+            setBorderPainted(false);
+            setFocusPainted(false);
+            setRolloverEnabled(true);
+            setCursor(java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR));
+        }
+
+        @Override protected void paintComponent(Graphics graphics) {
+            Graphics2D g = (Graphics2D) graphics.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            if (getModel().isRollover() || getModel().isPressed()) {
+                g.setColor(close ? new Color(250, 222, 215) : new Color(225, 239, 233));
+                g.fillRoundRect(1, 1, getWidth() - 2, getHeight() - 2, 11, 11);
+            }
+            if (hasFocus()) {
+                g.setColor(ChatTheme.TEAL_DARK);
+                g.setStroke(new BasicStroke(1.5f));
+                g.drawRoundRect(2, 2, getWidth() - 5, getHeight() - 5, 10, 10);
+            }
+            g.setColor(close && getModel().isRollover() ? new Color(169, 53, 43) : INK);
+            g.setFont(getFont());
+            var metrics = g.getFontMetrics();
+            g.drawString(getText(), (getWidth() - metrics.stringWidth(getText())) / 2,
+                    (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent());
+            g.dispose();
+        }
     }
 
     private void toggleMaximized() {
@@ -593,6 +624,26 @@ public final class MainFrame extends JFrame {
     /** Receives ProfileUpdateRequest when the user saves the account form. */
     public void setProfileUpdateListener(Consumer<ProfileUpdateRequest> listener) {
         profile.setUpdateListener(listener);
+    }
+
+    public void setLogoutListener(Runnable listener) {
+        profile.setLogoutListener(listener);
+    }
+
+    public void setLogoutPending(boolean pending) {
+        profile.setLogoutPending(pending);
+    }
+
+    public void setPasswordChangeListener(Consumer<ChangePasswordRequest> listener) {
+        profile.setPasswordChangeListener(listener);
+    }
+
+    public void setPasswordChangeFailed(String message) {
+        profile.setPasswordChangeFailed(message);
+    }
+
+    public void setPasswordChangeSucceeded() {
+        profile.setPasswordChangeSucceeded();
     }
 
     /** Call on the Swing event dispatch thread after the profile update succeeded. */

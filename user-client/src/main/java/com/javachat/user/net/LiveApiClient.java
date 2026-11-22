@@ -17,6 +17,7 @@ public final class LiveApiClient {
     private final HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5)).build();
     private final URI base;
+    private volatile String token;
 
     public LiveApiClient() throws IOException {
         String value = System.getenv().getOrDefault("JAVA_CHAT_API_URL", "http://127.0.0.1:8080");
@@ -35,10 +36,32 @@ public final class LiveApiClient {
         return request("POST", path, body);
     }
 
+    public long login(String login, String password) throws IOException {
+        Map<String, Object> result = post("/api/auth/login", Map.of(
+                "login", login, "password", password));
+        token = String.valueOf(result.get("token"));
+        return ((Number) result.get("userId")).longValue();
+    }
+
+    public void logout() throws IOException {
+        try {
+            post("/api/auth/logout", Map.of());
+        } finally {
+            token = null;
+        }
+    }
+
+    public void changePassword(String currentPassword, String newPassword) throws IOException {
+        post("/api/auth/change-password", Map.of(
+                "currentPassword", currentPassword, "newPassword", newPassword));
+        token = null;
+    }
+
     private Map<String, Object> request(String method, String path, Object body) throws IOException {
         HttpRequest.Builder builder = HttpRequest.newBuilder(base.resolve(path))
                 .timeout(Duration.ofSeconds(20))
                 .header("Accept", "application/json");
+        if (token != null) builder.header("Authorization", "Bearer " + token);
         if ("POST".equals(method)) {
             builder.header("Content-Type", "application/json; charset=utf-8")
                     .POST(HttpRequest.BodyPublishers.ofString(Json.stringify(body), StandardCharsets.UTF_8));
