@@ -68,6 +68,46 @@ public final class AdminRepository {
                     WHERE u.role = 'USER' AND u.status IN ('ACTIVE', 'BLOCKED')
                     ORDER BY u.created_at DESC LIMIT 500
                     """));
+            data.put("friendStats", rows(connection, """
+                    WITH listed AS (
+                        SELECT id, display_name, username, created_at
+                        FROM public.users
+                        WHERE role = 'USER' AND status <> 'DELETED'
+                        ORDER BY created_at DESC LIMIT 500
+                    ), accepted AS (
+                        SELECT f.requester_id, f.addressee_id
+                        FROM public.friendships f
+                        JOIN public.users a ON a.id = f.requester_id
+                        JOIN public.users b ON b.id = f.addressee_id
+                        WHERE f.status = 'ACCEPTED'
+                          AND a.role = 'USER' AND a.status <> 'DELETED'
+                          AND b.role = 'USER' AND b.status <> 'DELETED'
+                    ), edges AS (
+                        SELECT requester_id AS user_id, addressee_id AS friend_id FROM accepted
+                        UNION ALL
+                        SELECT addressee_id AS user_id, requester_id AS friend_id FROM accepted
+                    ), direct AS (
+                        SELECT l.id AS user_id, e.friend_id
+                        FROM listed l JOIN edges e ON e.user_id = l.id
+                    ), reachable AS (
+                        SELECT user_id, friend_id FROM direct
+                        UNION
+                        SELECT d.user_id, e.friend_id
+                        FROM direct d JOIN edges e ON e.user_id = d.friend_id
+                        WHERE e.friend_id <> d.user_id
+                    ), direct_counts AS (
+                        SELECT user_id, COUNT(*) AS direct_count FROM direct GROUP BY user_id
+                    ), reach_counts AS (
+                        SELECT user_id, COUNT(*) AS network_count FROM reachable GROUP BY user_id
+                    )
+                    SELECT l.id, l.display_name, l.username, l.created_at,
+                           COALESCE(dc.direct_count, 0) AS direct_count,
+                           COALESCE(rc.network_count, 0) AS network_count
+                    FROM listed l
+                    LEFT JOIN direct_counts dc ON dc.user_id = l.id
+                    LEFT JOIN reach_counts rc ON rc.user_id = l.id
+                    ORDER BY l.created_at DESC
+                    """));
             data.put("activeUsers", rows(connection, """
                     SELECT u.id, u.display_name, u.username,
                            MAX(s.logged_in_at) AS last_login,

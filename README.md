@@ -5,8 +5,9 @@ the protocol types, DTOs, and models shared by the server and clients. Its Java
 package remains `com.javachat.shared` for compatibility with existing imports.
 The `server` module contains the local HTTP API and depends on
 `common`. The `admin-client` module contains the Swing admin dashboard with
-screens for login history, groups, spam reports, user management, new users,
-active users, and registration statistics. The `user-client` module contains the chat UI: the
+screens for login history, groups, spam reports, user management, friend
+statistics, new users, active users, and registration statistics. The
+`user-client` module contains the chat UI: the
 main window and conversation list (JC-25), the chat frame (JC-26), history
 search (JC-27), the AI reply
 suggestion panel (JC-28), the friend list screen (JC-30), the friend request
@@ -24,7 +25,7 @@ powershell -ExecutionPolicy Bypass -File .\run-admin.ps1
 
 The admin client signs in through `/api/admin/auth/login` using a `public.users`
 account with `role = 'ADMIN'` and `status = 'ACTIVE'`. The server checks the
-session role on every admin request. All seven screens load current Supabase data
+session role on every admin request. All eight screens load current Supabase data
 through `/api/admin/snapshot`; **Làm mới** reloads it. Reviewing or dismissing
 a pending spam report updates `public.reports` in Supabase. The **Quản lý người
 dùng** page searches and filters `USER` accounts, and can block or unblock a
@@ -36,6 +37,12 @@ create a `USER` account with display name, username, email, and password, or
 edit an existing user's display name, username, and email. The dialogs validate
 input before calling the role-protected server API and refresh the list after
 the database write succeeds.
+The **Thống kê bạn bè** page lists each user's accepted direct friendships and
+the distinct people reachable through a direct friend. Its second count
+includes direct friends and friends of friends, excludes the user themself,
+and counts each person once. It supports sorting by Vietnamese display name
+or account creation time, filtering by name, and comparing direct friend counts
+to an entered number (equal, less than, or greater than).
 The active-user screen shows accounts with unexpired login sessions; it is not
 a real-time presence feed. Admin lists return at most 500 recent rows per page.
 

@@ -144,6 +144,7 @@ public final class AdminFrame extends JFrame {
         addNav(menu, "groups", "▤", "Danh sách nhóm chat");
         addNav(menu, "reports", "⚑", "Báo cáo spam");
         addNav(menu, "users", "◎", "Quản lý người dùng");
+        addNav(menu, "friend-stats", "♧", "Thống kê bạn bè");
         addNav(menu, "new-users", "+", "Người dùng đăng ký mới");
         addNav(menu, "active-users", "◉", "Người dùng hoạt động");
         addNav(menu, "chart", "▥", "Biểu đồ đăng ký");
@@ -185,6 +186,7 @@ public final class AdminFrame extends JFrame {
         cards.add(new SpamReportPanel(AdminData.rows(snapshot, "reports"), this::updateReport), "reports");
         cards.add(new UserManagementPanel(AdminData.rows(snapshot, "users"), this::updateUserStatus,
                 this::createUser, this::editUser), "users");
+        cards.add(new FriendStatisticsPanel(AdminData.rows(snapshot, "friendStats")), "friend-stats");
         cards.add(new NewUserPanel(AdminData.rows(snapshot, "newUsers")), "new-users");
         cards.add(new ActiveUserPanel(AdminData.rows(snapshot, "activeUsers")), "active-users");
         cards.add(new RegistrationChartPanel(AdminData.rows(snapshot, "registrationTrend")), "chart");

@@ -158,3 +158,30 @@ Thêm dialog cho admin tạo và cập nhật tài khoản `USER` từ trang qu�
 - Biên dịch toàn bộ mã Java; render headless trang quản lý và chạy kiểm tra tìm
   kiếm, lọc, ánh xạ hành động theo ID tài khoản.
 - Chưa thêm hoặc sửa tài khoản trên Supabase thật trong lúc kiểm tra.
+
+## Thêm màn hình thống kê bạn bè
+
+### Yêu cầu
+
+Xem danh sách người dùng cùng số bạn trực tiếp và số người tính cả bạn của bạn;
+sắp xếp theo tên/thời gian tạo, lọc theo tên và so sánh số bạn trực tiếp với
+giá trị nhập.
+
+### AI đã làm gì
+
+- Thêm truy vấn chỉ đọc từ các quan hệ `friendships.status = 'ACCEPTED'`.
+  Quan hệ tính hai chiều; cột mạng hai bước gồm bạn trực tiếp và bạn của bạn,
+  loại trùng và không tính chính tài khoản.
+- Thêm trang **Thống kê bạn bè** vào điều hướng admin, dùng cùng template kem/
+  teal và bảng có cột số căn phải.
+- Thêm sắp xếp tên A–Z/Z–A theo tiếng Việt, mới/cũ theo thời gian tạo; lọc tên
+  không phân biệt dấu, và lọc số bạn trực tiếp bằng/nhỏ hơn/lớn hơn số nhập.
+- Cập nhật kiểm tra phiên bản snapshot và README.
+
+### Kiểm tra
+
+- Biên dịch toàn bộ Java và `git diff --check` thành công.
+- Snapshot chỉ đọc từ Supabase trả 7 dòng thống kê; số mạng hai bước không nhỏ
+  hơn số bạn trực tiếp ở từng dòng.
+- Render headless trang mới; kiểm tra sắp xếp tên/ngày tạo, lọc tên không dấu,
+  và ba kiểu so sánh số lượng bạn trực tiếp.

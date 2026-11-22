@@ -45,9 +45,12 @@ final class AdminData {
 
     static String time(Map<String, Object> row, String key) {
         Object value = row.get(key);
-        if (value == null) return "—";
-        try { return TIME.format(Instant.parse(String.valueOf(value)).atZone(LOCAL)); }
-        catch (RuntimeException error) { return String.valueOf(value); }
+        return value == null ? "—" : formatTime(String.valueOf(value));
+    }
+
+    static String formatTime(String value) {
+        try { return TIME.format(Instant.parse(value).atZone(LOCAL)); }
+        catch (RuntimeException error) { return value; }
     }
 
     static String day(Map<String, Object> row) {
