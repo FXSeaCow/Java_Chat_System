@@ -185,3 +185,26 @@ giá trị nhập.
   hơn số bạn trực tiếp ở từng dòng.
 - Render headless trang mới; kiểm tra sắp xếp tên/ngày tạo, lọc tên không dấu,
   và ba kiểu so sánh số lượng bạn trực tiếp.
+
+## Tách thay đổi thành bốn commit
+
+### Yêu cầu
+
+Tách các sửa đổi trên nhánh JC36 thành bốn commit theo thứ tự: xử lý conflict,
+quản lý người dùng, dialog thêm/sửa người dùng, thống kê bạn bè; sau đó ghi AI log
+và đẩy nhánh lên remote.
+
+### AI đã làm gì
+
+- `8a1a30f` — xử lý tích hợp JC36, đồng bộ giao diện quản trị và dữ liệu Supabase.
+- `189b823` — thêm màn hình quản lý người dùng.
+- `605a80c` — thêm dialog tạo và cập nhật người dùng.
+- `1165fbd` — thêm màn hình thống kê bạn bè.
+- Ghi phần nhật ký này thành commit tài liệu riêng sau bốn commit chức năng.
+
+### Kiểm tra
+
+- Biên dịch từng mốc thay đổi độc lập: lần lượt 71, 72, 73 và 74 tệp Java.
+- `git diff --cached --check` thành công ở từng commit; working tree sạch sau commit thứ tư.
+- Xác nhận nhánh remote JC36 là tổ tiên của HEAD trước khi push, nên có thể đẩy theo kiểu fast-forward.
+- Chưa ghi dữ liệu thêm/sửa người dùng vào Supabase thật trong lúc kiểm tra.
