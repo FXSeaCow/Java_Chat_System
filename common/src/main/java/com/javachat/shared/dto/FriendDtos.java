@@ -17,11 +17,18 @@ public final class FriendDtos {
     public record FriendListResponse(
             List<User> friends,
             List<Friendship> incomingRequests,
-            List<Friendship> outgoingRequests) {
+            List<Friendship> outgoingRequests,
+            List<Long> onlineFriendIds) {
         public FriendListResponse {
             friends = friends == null ? List.of() : List.copyOf(friends);
             incomingRequests = incomingRequests == null ? List.of() : List.copyOf(incomingRequests);
             outgoingRequests = outgoingRequests == null ? List.of() : List.copyOf(outgoingRequests);
+            onlineFriendIds = onlineFriendIds == null ? List.of() : List.copyOf(onlineFriendIds);
+        }
+
+        public FriendListResponse(List<User> friends, List<Friendship> incomingRequests,
+                                  List<Friendship> outgoingRequests) {
+            this(friends, incomingRequests, outgoingRequests, List.of());
         }
     }
 
