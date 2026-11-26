@@ -33,3 +33,31 @@ loopback, tự đọc và ghi khung tin JSON, xử lý từng client độc lậ
 - Biên dịch Java 21 bằng `javac`; smoke test TCP mở hai client trên loopback.
 - Chưa kiểm thử với PostgreSQL thật. Client desktop vẫn dùng HTTP cho nghiệp vụ
   chat, bạn bè và nhóm.
+
+## JC-55 – Xác thực client khi kết nối
+
+### Yêu cầu
+
+Client phải đăng nhập hoặc dùng lại token phiên hợp lệ trước khi gửi request
+cần xác thực qua TCP.
+
+### Kế hoạch của AI
+
+Dùng chung `AccountRepository` với HTTP API, lưu token cho từng kết nối và kiểm
+tra lại token trong cơ sở dữ liệu trước mỗi request được bảo vệ.
+
+### AI đã làm gì
+
+- `AUTH_LOGIN_REQUEST` nhận `payload.login` và `payload.password`, trả token và
+  `userId` trong `AUTH_LOGIN_RESPONSE`.
+- `SYSTEM_HELLO_REQUEST` nhận `authToken` để tiếp tục phiên trên kết nối mới;
+  `AUTH_LOGOUT_REQUEST` thu hồi phiên. Request thiếu phiên hoặc token hết hạn
+  nhận `ERROR_RESPONSE` cùng `requestId` khi request hợp lệ.
+- Thêm `TcpServerSmokeTest` dùng bộ xác thực giả để kiểm tra mật khẩu sai,
+  đăng nhập, tiếp tục phiên trên kết nối thứ hai và token bị thu hồi.
+
+### Kiểm tra và giới hạn
+
+- Biên dịch và chạy smoke test bằng JDK 21; chưa thử đăng nhập TCP với
+  PostgreSQL thật.
+- Cổng TCP chỉ lắng nghe loopback theo cấu hình `ServerApp` hiện tại.
