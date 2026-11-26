@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Database operations for one local development account. */
 public final class ChatRepository {
@@ -65,6 +66,29 @@ public final class ChatRepository {
                             + "FROM public.message_attachments a JOIN public.messages m ON m.id = a.message_id "
                             + "WHERE m.conversation_id IN (" + mine + ") ORDER BY a.id", currentUserId));
             connection.commit();
+            return result;
+        }
+    }
+
+    public List<Long> onlineFriendIds(Set<Long> onlineUserIds) throws SQLException {
+        if (onlineUserIds.isEmpty()) return List.of();
+        try (Connection connection = config.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT CASE WHEN requester_id = ? THEN addressee_id ELSE requester_id END AS friend_id
+                     FROM public.friendships
+                     WHERE status = 'ACCEPTED' AND (requester_id = ? OR addressee_id = ?)
+                     ORDER BY friend_id
+                     """)) {
+            statement.setLong(1, currentUserId);
+            statement.setLong(2, currentUserId);
+            statement.setLong(3, currentUserId);
+            List<Long> result = new ArrayList<>();
+            try (ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    long friendId = rows.getLong(1);
+                    if (onlineUserIds.contains(friendId)) result.add(friendId);
+                }
+            }
             return result;
         }
     }

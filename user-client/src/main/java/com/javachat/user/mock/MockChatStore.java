@@ -37,6 +37,7 @@ public final class MockChatStore {
     private final Map<Long, List<ChatMessage>> messages = new HashMap<>();
     private final List<ConversationMember> members = new ArrayList<>();
     private final List<Friendship> friendships = new ArrayList<>();
+    private List<Long> onlineFriendIds = List.of(2L);
     private long nextConversationId = 6;
     private long nextMessageId = 13;
     private long nextFriendshipId = 7;
@@ -54,6 +55,11 @@ public final class MockChatStore {
     public static MockChatStore fromSnapshot(Map<String, Object> snapshot) {
         MockChatStore store = new MockChatStore(false);
         store.currentUserId = number(snapshot, "currentUserId");
+        store.onlineFriendIds = List.of();
+        if (snapshot.get("onlineFriendIds") != null) {
+            store.onlineFriendIds = Json.array(snapshot.get("onlineFriendIds")).stream()
+                    .map(value -> ((Number) value).longValue()).toList();
+        }
         for (Object value : Json.array(snapshot.get("users"))) {
             Map<String, Object> row = Json.object(value);
             long id = number(row, "id");
@@ -196,7 +202,7 @@ public final class MockChatStore {
         List<Friendship> outgoing = friendships.stream()
                 .filter(item -> item.status() == FriendshipStatus.PENDING
                         && item.requesterId() == currentUserId).toList();
-        return new FriendListResponse(friends, incoming, outgoing);
+        return new FriendListResponse(friends, incoming, outgoing, onlineFriendIds);
     }
 
     public List<User> requestUsers() {

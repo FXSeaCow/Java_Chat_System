@@ -98,7 +98,31 @@ starting the client. The server reads and writes conversations, messages,
 friend requests, and groups in PostgreSQL. It binds only to loopback. Sign-in
 checks `public.users` and creates a session in `public.auth_sessions`; each API
 request uses the signed-in account's ID.
-Presence and AI suggestions are still unavailable in live mode.
+
+The server also accepts raw TCP clients on `127.0.0.1:9090` by default
+(`server.tcp.port` or `JAVA_CHAT_TCP_PORT`). Each frame has a 4-byte big-endian
+length followed by UTF-8 JSON using the envelope in
+`docs/protocol/json-message-types.md`. The TCP listener currently responds to
+`SYSTEM_HELLO_REQUEST`, `AUTH_LOGIN_REQUEST`, `AUTH_LOGOUT_REQUEST`, and
+`SYSTEM_PING`; other request types return `ERROR_RESPONSE`. Send
+`AUTH_LOGIN_REQUEST` with `payload.login` and `payload.password` to receive a
+session token. On a new connection, send that token as `authToken` in
+`SYSTEM_HELLO_REQUEST` to resume the session. `SYSTEM_PING` and other protected
+requests require an authenticated connection. Tokens are checked against the
+database on each protected request, including after logout or expiry. The
+desktop clients continue to use the HTTP API.
+
+In live mode, successful user login returns `onlineFriendIds` alongside the
+token. The authenticated snapshot includes the same list, and `GET
+/api/presence` refreshes it every 15 seconds in the desktop client. Presence
+tracks recent authenticated activity per session; a session is considered
+offline 45 seconds after its last request or immediately after logout.
+Authenticated desktop clients also keep a TCP connection open. When a user
+comes online, logs out, loses the TCP connection, or times out, the server
+sends `USER_PRESENCE_CHANGED_EVENT` to connected online friends. The desktop
+passes that event to `MainFrame.applyPresence(...)` on the Swing event thread;
+the periodic `/api/presence` refresh also recovers missed events.
+AI suggestions are still unavailable in live mode.
 
 In live mode, the registration form calls `POST /api/auth/register` on the local
 server and inserts a row into `public.users`. Passwords are stored as PBKDF2

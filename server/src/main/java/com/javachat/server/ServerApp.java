@@ -4,6 +4,7 @@ import com.javachat.server.database.ChatRepository;
 import com.javachat.server.database.AccountRepository;
 import com.javachat.server.database.AdminRepository;
 import com.javachat.server.database.DatabaseConfig;
+import com.javachat.server.net.TcpServer;
 import com.javachat.shared.json.Json;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -19,10 +20,13 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /** Loopback-only authenticated API for the desktop client. */
 public final class ServerApp {
+    private static final PresenceTracker PRESENCE = new PresenceTracker();
     private ServerApp() { }
 
     public static void main(String[] args) throws Exception {
@@ -45,8 +49,59 @@ public final class ServerApp {
         HttpServer server = HttpServer.create(new InetSocketAddress(address, port), 0);
         server.createContext("/api/", exchange -> handle(exchange, databaseConfig, accounts));
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
+        int tcpPort = Integer.parseInt(System.getenv().getOrDefault(
+                "JAVA_CHAT_TCP_PORT", settings.getProperty("server.tcp.port", "9090")).trim());
+        TcpServer tcpServer = new TcpServer(address, tcpPort, new TcpServer.Authentication() {
+            @Override
+            public AccountRepository.LoginResult login(String login, String password,
+                                                       String ipAddress, String deviceInfo) throws SQLException {
+                AccountRepository.LoginResult result = accounts.login(login, password, ipAddress, deviceInfo);
+                PRESENCE.online(result.userId(), result.token());
+                return result;
+            }
+
+            @Override
+            public long authenticatedUser(String token) throws SQLException {
+                long userId = accounts.authenticatedUser(token);
+                if (userId >= 0) PRESENCE.online(userId, token);
+                return userId;
+            }
+
+            @Override
+            public void logout(String token, long userId) throws SQLException {
+                accounts.logout(token, userId);
+                PRESENCE.offline(token);
+            }
+
+            @Override
+            public void disconnected(String token) {
+                PRESENCE.offline(token);
+            }
+        });
+        PRESENCE.setListener((userId, status) -> {
+            try {
+                Set<Long> friends = Set.copyOf(new ChatRepository(databaseConfig, userId)
+                        .onlineFriendIds(PRESENCE.onlineUserIds()));
+                tcpServer.publishPresence(userId, status, friends);
+            } catch (SQLException error) {
+                System.err.println("Presence broadcast failed SQLSTATE " + error.getSQLState());
+            }
+        });
+        var presenceSweep = Executors.newSingleThreadScheduledExecutor(runnable ->
+                Thread.ofVirtual().name("chat-presence-sweep").unstarted(runnable));
+        presenceSweep.scheduleAtFixedRate(PRESENCE::onlineUserIds, 15, 15, TimeUnit.SECONDS);
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            server.stop(0);
+            presenceSweep.shutdownNow();
+            try {
+                tcpServer.close();
+            } catch (IOException error) {
+                System.err.println("TCP shutdown failed: " + error.getMessage());
+            }
+        }));
         server.start();
         System.out.println("E-Chat API listening at http://" + host + ":" + server.getAddress().getPort());
+        System.out.println("E-Chat TCP listening at " + host + ":" + tcpServer.port());
     }
 
     private static void handle(HttpExchange exchange, DatabaseConfig databaseConfig,
@@ -57,7 +112,17 @@ public final class ServerApp {
             if ("GET".equals(method) && "/api/snapshot".equals(path)) {
                 long userId = authenticatedUser(exchange, accounts);
                 if (userId < 0) return;
-                respond(exchange, 200, new ChatRepository(databaseConfig, userId).snapshot());
+                ChatRepository repository = new ChatRepository(databaseConfig, userId);
+                Map<String, Object> snapshot = repository.snapshot();
+                snapshot.put("onlineFriendIds", repository.onlineFriendIds(PRESENCE.onlineUserIds()));
+                respond(exchange, 200, snapshot);
+                return;
+            }
+            if ("GET".equals(method) && "/api/presence".equals(path)) {
+                long userId = authenticatedUser(exchange, accounts);
+                if (userId < 0) return;
+                respond(exchange, 200, Map.of("onlineFriendIds",
+                        new ChatRepository(databaseConfig, userId).onlineFriendIds(PRESENCE.onlineUserIds())));
                 return;
             }
             if ("GET".equals(method) && "/api/admin/snapshot".equals(path)) {
@@ -86,7 +151,10 @@ public final class ServerApp {
                         string(body, "login"), string(body, "password"),
                         exchange.getRemoteAddress().getAddress().getHostAddress(),
                         exchange.getRequestHeaders().getFirst("User-Agent"));
-                respond(exchange, 200, Map.of("token", login.token(), "userId", login.userId()));
+                PRESENCE.online(login.userId(), login.token());
+                respond(exchange, 200, Map.of("token", login.token(), "userId", login.userId(),
+                        "onlineFriendIds", new ChatRepository(databaseConfig, login.userId())
+                                .onlineFriendIds(PRESENCE.onlineUserIds())));
                 return;
             }
             if ("/api/admin/auth/login".equals(path)) {
@@ -138,6 +206,7 @@ public final class ServerApp {
             if (userId < 0) return;
             if ("/api/auth/logout".equals(path)) {
                 accounts.logout(bearerToken(exchange), userId);
+                PRESENCE.offline(bearerToken(exchange));
                 respond(exchange, 200, Map.of("ok", true));
                 return;
             }
@@ -202,6 +271,7 @@ public final class ServerApp {
             throws IOException, SQLException {
         String token = bearerToken(exchange);
         long userId = token == null ? -1 : accounts.authenticatedUser(token);
+        if (userId >= 0) PRESENCE.online(userId, token);
         if (userId < 0) respond(exchange, 401, Map.of("error", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn."));
         return userId;
     }

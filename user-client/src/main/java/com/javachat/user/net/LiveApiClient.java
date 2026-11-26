@@ -11,6 +11,9 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
+import java.util.List;
+import java.util.function.Consumer;
+import com.javachat.shared.dto.AuthDtos.PresenceChangedEvent;
 
 /** HTTP client for the loopback Java server. Database credentials never enter requests. */
 public final class LiveApiClient {
@@ -30,6 +33,17 @@ public final class LiveApiClient {
 
     public Map<String, Object> snapshot() throws IOException {
         return request("GET", "/api/snapshot", null);
+    }
+
+    public List<Long> onlineFriendIds() throws IOException {
+        return Json.array(request("GET", "/api/presence", null).get("onlineFriendIds"))
+                .stream().map(value -> ((Number) value).longValue()).toList();
+    }
+
+    public PresenceSocketClient listenForPresence(Consumer<PresenceChangedEvent> onEvent) {
+        if (token == null) throw new IllegalStateException("Login is required");
+        int port = Integer.parseInt(System.getenv().getOrDefault("JAVA_CHAT_TCP_PORT", "9090"));
+        return new PresenceSocketClient(base.getHost(), port, token, onEvent);
     }
 
     public Map<String, Object> post(String path, Map<String, Object> body) throws IOException {

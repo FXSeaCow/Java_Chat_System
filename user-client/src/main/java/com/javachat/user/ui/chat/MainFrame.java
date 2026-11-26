@@ -561,6 +561,7 @@ public final class MainFrame extends JFrame {
         friends.setFriendList(response);
         friendRequests.setFriendList(response);
         onlineFriends.setFriendList(response);
+        if (response != null) setOnlineUserIds(response.onlineFriendIds());
     }
 
     /** Initial set of online user IDs, if the application has a presence snapshot. */
