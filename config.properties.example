@@ -4,6 +4,7 @@
 # TCP server and client connection
 server.host=127.0.0.1
 server.port=8080
+server.tcp.port=9090
 
 # Supabase Dashboard > Connect > Direct connection or Session pooler.
 # Keep the JDBC prefix, host, port and database name. Use port 5432 for
