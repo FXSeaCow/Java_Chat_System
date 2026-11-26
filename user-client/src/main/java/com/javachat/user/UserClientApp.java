@@ -6,6 +6,7 @@ import com.javachat.shared.dto.FriendDtos.FriendRequestDecision;
 import com.javachat.shared.model.PresenceStatus;
 import com.javachat.user.mock.MockChatStore;
 import com.javachat.user.net.LiveApiClient;
+import com.javachat.user.net.PresenceSocketClient;
 import com.javachat.user.ui.chat.MainFrame;
 import com.javachat.user.ui.auth.LoginFrame;
 
@@ -238,7 +239,26 @@ public final class UserClientApp {
         } else {
             frame.setAiSuggestionListener(request -> frame.setAiSuggestionError(request.conversationId(),
                     "Gợi ý AI chưa được kết nối với server."));
-            frame.setOnlineUserIds(List.of());
+            PresenceSocketClient events = api.listenForPresence(update ->
+                    SwingUtilities.invokeLater(() -> {
+                        if (frame.isDisplayable()) frame.applyPresence(update);
+                    }));
+            Timer presenceTimer = new Timer(15_000, event -> CompletableFuture.supplyAsync(() -> {
+                try {
+                    return api.onlineFriendIds();
+                } catch (Exception error) {
+                    return null;
+                }
+            }).thenAccept(ids -> SwingUtilities.invokeLater(() -> {
+                if (frame.isDisplayable() && ids != null) frame.setOnlineUserIds(ids);
+            })));
+            presenceTimer.start();
+            frame.addWindowListener(new WindowAdapter() {
+                @Override public void windowClosed(WindowEvent event) {
+                    presenceTimer.stop();
+                    events.close();
+                }
+            });
         }
         refresh(frame, initial);
     }

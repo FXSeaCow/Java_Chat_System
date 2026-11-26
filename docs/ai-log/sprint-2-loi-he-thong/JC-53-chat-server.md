@@ -91,3 +91,36 @@ online với quan hệ bạn bè đã chấp nhận, rồi đưa danh sách ID v
 - `MockChatStoreSmokeTest` kiểm tra danh sách ID được chuyển từ snapshot vào
   `FriendListResponse`; biên dịch các module bằng `javac` 21.
 - Chưa kiểm thử truy vấn bạn bè online với PostgreSQL thật.
+
+## JC-57 – Đẩy trạng thái online/offline cho bạn bè
+
+### Yêu cầu
+
+Khi người dùng online, đăng xuất hoặc mất kết nối, server gửi
+`USER_PRESENCE_CHANGED_EVENT` cho các bạn bè đang online. Client áp dụng event
+vào `MainFrame`.
+
+### Kế hoạch của AI
+
+Phát event khi trạng thái tổng hợp của người dùng thật sự thay đổi; giữ một
+kết nối TCP ở user-client để nhận event và cập nhật Swing trên EDT.
+
+### AI đã làm gì
+
+- `PresenceTracker` phát chuyển trạng thái một lần cho mỗi người dùng, kể cả
+  khi có nhiều phiên. Server quét phiên quá thời gian hoạt động mỗi 15 giây.
+- `TcpServer.publishPresence(...)` gửi event JSON đến các kết nối TCP đã xác
+  thực của bạn bè; ghi ra socket được đồng bộ với response thông thường.
+- `PresenceSocketClient` xác thực bằng token qua `SYSTEM_HELLO_REQUEST`, nhận
+  event, gửi ping và thử kết nối lại khi socket ngắt. `UserClientApp` gọi
+  `MainFrame.applyPresence(...)` bằng `SwingUtilities.invokeLater(...)`.
+- Client gọi `/api/presence` mỗi 15 giây để phục hồi nếu bỏ lỡ event.
+
+### Kiểm tra và giới hạn
+
+- `PresenceTrackerSmokeTest` kiểm tra nhiều phiên; `TcpServerSmokeTest` kiểm tra
+  event tới hai kết nối; `MockChatStoreSmokeTest` kiểm tra dữ liệu snapshot.
+  Biên dịch tất cả module bằng `javac` 21.
+- Chưa kiểm thử tích hợp với PostgreSQL thật và hai ứng dụng desktop chạy đồng
+  thời. Chat, bạn bè và nhóm vẫn gọi HTTP API; JC-153 và JC-154 là phạm vi tiếp
+  theo để chuyển toàn bộ giao tiếp nghiệp vụ sang socket.
