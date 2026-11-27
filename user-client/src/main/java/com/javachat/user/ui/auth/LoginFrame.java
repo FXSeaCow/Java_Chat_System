@@ -10,6 +10,8 @@ import javax.swing.JCheckBox;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JDialog;
+import javax.swing.JTextArea;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
@@ -44,6 +46,7 @@ import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import com.javachat.user.net.LiveApiClient.ApiException;
 
 /** Warm, mascot-led authentication window for the desktop client. */
 public final class LoginFrame extends JFrame {
@@ -60,12 +63,16 @@ public final class LoginFrame extends JFrame {
     private static final Color ERROR = new Color(184, 40, 40);
     private static final Font BODY = new Font(Font.SANS_SERIF, Font.PLAIN, 15);
     private static final Font MEDIUM = new Font(Font.SANS_SERIF, Font.BOLD, 15);
-    private static final int AUTH_CARD_DEFAULT_HEIGHT = 330;
+    private static final int AUTH_CARD_DEFAULT_HEIGHT = 360;
     private static final int AUTH_CARD_FORGOT_HEIGHT = 230;
 
     private final Runnable onAuthenticated;
     private final LoginHandler loginHandler;
     private final RegistrationHandler registrationHandler;
+    private final OtpSender otpSender;
+    private final PasswordResetHandler passwordResetHandler;
+    private boolean registrationPending;
+    private boolean loginPending;
     private final JTextField loginField = new RoundedTextField("you@example.com");
     private final JPasswordField passwordField = new RoundedPasswordField();
     private final JLabel loginError = errorLabel();
@@ -78,10 +85,8 @@ public final class LoginFrame extends JFrame {
     private final JLabel registrationEmailError = errorLabel();
     private final JLabel registrationPasswordError = errorLabel();
     private final JLabel confirmPasswordError = errorLabel();
-    private final JLabel termsError = errorLabel();
     private final JTextField forgotEmailField = new RoundedTextField("you@example.com");
     private final JLabel forgotEmailError = errorLabel();
-    private final JCheckBox termsCheckBox = new JCheckBox("Tôi đồng ý với Điều khoản sử dụng");
     private final CardLayout authCardLayout = new CardLayout();
     private final JPanel authCards = new JPanel(authCardLayout);
     private final JLabel formStatus = new JLabel(" ");
@@ -89,7 +94,6 @@ public final class LoginFrame extends JFrame {
     private final PawModeSwitch modeSwitch = new PawModeSwitch();
     private final JLabel heading = new JLabel("Chào mừng trở lại!");
     private final JLabel subheading = new JLabel("Đăng nhập để tiếp tục trò chuyện cùng bạn bè.");
-    private Timer forgotPasswordTimer;
     private boolean signUpMode;
     private boolean forgotPasswordMode;
 
@@ -99,15 +103,27 @@ public final class LoginFrame extends JFrame {
     }
 
     @FunctionalInterface
-    public interface RegistrationHandler {
-        long register(String displayName, String email, String password) throws Exception;
+    public interface OtpSender {
+        void send(String email) throws Exception;
     }
 
-    public LoginFrame(Runnable onAuthenticated, LoginHandler loginHandler,
-                      RegistrationHandler registrationHandler) {
+    @FunctionalInterface
+    public interface PasswordResetHandler {
+        void request(String email, String otp) throws Exception;
+    }
+
+    @FunctionalInterface
+    public interface RegistrationHandler {
+        long register(String displayName, String email, String password, String otp) throws Exception;
+    }
+
+    public LoginFrame(Runnable onAuthenticated, LoginHandler loginHandler, OtpSender otpSender,
+                      RegistrationHandler registrationHandler, PasswordResetHandler passwordResetHandler) {
         super("Java Chat - Đăng nhập");
         this.onAuthenticated = Objects.requireNonNull(onAuthenticated);
         this.loginHandler = loginHandler;
+        this.otpSender = otpSender;
+        this.passwordResetHandler = passwordResetHandler;
         this.registrationHandler = registrationHandler;
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         Rectangle usableScreen = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
@@ -233,7 +249,7 @@ public final class LoginFrame extends JFrame {
 
     private JPanel buildForgotPasswordCard() {
         JPanel card = verticalCard();
-        JLabel guidance = new JLabel("<html>Nhập email đã đăng ký để nhận liên kết<br>tạo mật khẩu mới.</html>");
+        JLabel guidance = new JLabel("<html>Nhập email đã đăng ký để nhận mã xác minh<br>và yêu cầu mật khẩu mới.</html>");
         guidance.setFont(BODY);
         guidance.setForeground(MUTED);
         guidance.setAlignmentX(LEFT_ALIGNMENT);
@@ -269,13 +285,13 @@ public final class LoginFrame extends JFrame {
         card.add(registrationEmailField);
         card.add(registrationEmailError);
 
-        JPanel labels = new JPanel(new GridLayout(1, 2, 10, 0));
-        labels.setOpaque(false);
-        labels.setAlignmentX(LEFT_ALIGNMENT);
-        labels.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
-        labels.add(fieldLabel("Mật khẩu"));
-        labels.add(fieldLabel("Xác nhận mật khẩu"));
-        card.add(labels);
+        JPanel passwordLabels = new JPanel(new GridLayout(1, 2, 10, 0));
+        passwordLabels.setOpaque(false);
+        passwordLabels.setAlignmentX(LEFT_ALIGNMENT);
+        passwordLabels.setMaximumSize(new Dimension(Integer.MAX_VALUE, 22));
+        passwordLabels.add(fieldLabel("Mật khẩu"));
+        passwordLabels.add(fieldLabel("Xác nhận mật khẩu"));
+        card.add(passwordLabels);
         card.add(Box.createVerticalStrut(5));
 
         JPanel passwordFields = new JPanel(new GridLayout(1, 2, 10, 0));
@@ -295,19 +311,37 @@ public final class LoginFrame extends JFrame {
         passwordErrors.add(registrationPasswordError);
         passwordErrors.add(confirmPasswordError);
         card.add(passwordErrors);
+        registrationPasswordField.getDocument().addDocumentListener(
+                onTextChange(this::updateRegistrationPasswordHint));
 
         JCheckBox showPassword = compactCheckBox("Hiện mật khẩu");
         char passwordEcho = registrationPasswordField.getEchoChar();
+        showPassword.addActionListener(event -> registrationPasswordField.setEchoChar(
+                showPassword.isSelected() ? (char) 0 : passwordEcho));
+        JCheckBox showConfirmation = compactCheckBox("Hiện xác nhận");
         char confirmEcho = confirmPasswordField.getEchoChar();
-        showPassword.addActionListener(event -> {
-            registrationPasswordField.setEchoChar(showPassword.isSelected() ? (char) 0 : passwordEcho);
-            confirmPasswordField.setEchoChar(showPassword.isSelected() ? (char) 0 : confirmEcho);
-        });
-        card.add(showPassword);
+        showConfirmation.addActionListener(event -> confirmPasswordField.setEchoChar(
+                showConfirmation.isSelected() ? (char) 0 : confirmEcho));
+        JPanel passwordToggles = new JPanel(new GridLayout(1, 2, 10, 0));
+        passwordToggles.setOpaque(false);
+        passwordToggles.setAlignmentX(LEFT_ALIGNMENT);
+        passwordToggles.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+        passwordToggles.add(showPassword);
+        passwordToggles.add(showConfirmation);
+        card.add(passwordToggles);
 
-        configureCheckBox(termsCheckBox);
-        card.add(termsCheckBox);
-        card.add(termsError);
+        JPanel signInPrompt = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 4, 0));
+        signInPrompt.setOpaque(false);
+        signInPrompt.setAlignmentX(LEFT_ALIGNMENT);
+        signInPrompt.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+        JLabel existingAccount = new JLabel("Đã có tài khoản?");
+        existingAccount.setFont(BODY);
+        existingAccount.setForeground(MUTED);
+        signInPrompt.add(existingAccount);
+        JButton signIn = linkButton("Đăng nhập");
+        signIn.addActionListener(event -> setMode(false));
+        signInPrompt.add(signIn);
+        card.add(signInPrompt);
         return card;
     }
 
@@ -364,7 +398,10 @@ public final class LoginFrame extends JFrame {
     }
 
     private void setMode(boolean signUp) {
-        cancelForgotPasswordRequest();
+        if (registrationPending || loginPending) {
+            modeSwitch.setSignUp(signUpMode);
+            return;
+        }
         forgotPasswordMode = false;
         signUpMode = signUp;
         setAuthCardHeight(AUTH_CARD_DEFAULT_HEIGHT);
@@ -375,15 +412,17 @@ public final class LoginFrame extends JFrame {
         subheading.setText(signUp
                 ? "Tham gia Java Chat và bắt đầu cuộc trò chuyện đầu tiên."
                 : "Đăng nhập để tiếp tục trò chuyện cùng bạn bè.");
-        submitButton.setText(signUp ? "Tạo tài khoản" : "Đăng nhập");
+        submitButton.setText(signUp ? "Đăng ký" : "Đăng nhập");
         submitButton.setEnabled(true);
         authCardLayout.show(authCards, signUp ? "register" : "login");
         clearErrors();
+        if (signUp) updateRegistrationPasswordHint();
         javax.swing.SwingUtilities.invokeLater(() ->
                 (signUp ? fullNameField : loginField).requestFocusInWindow());
     }
 
     private void showForgotPassword() {
+        if (loginPending) return;
         clearErrors();
         forgotPasswordMode = true;
         signUpMode = false;
@@ -392,7 +431,7 @@ public final class LoginFrame extends JFrame {
         modeSwitch.setVisible(false);
         heading.setText("Quên mật khẩu?");
         subheading.setText("Đừng lo, Java Chat sẽ giúp bạn quay lại.");
-        submitButton.setText("Gửi liên kết đặt lại");
+        submitButton.setText("Gửi mã xác minh");
         submitButton.setEnabled(true);
         authCardLayout.show(authCards, "forgot");
         String login = loginField.getText().trim();
@@ -411,6 +450,7 @@ public final class LoginFrame extends JFrame {
     }
 
     private void submit() {
+        if (registrationPending || loginPending) return;
         clearErrors();
         if (forgotPasswordMode) {
             submitForgotPassword();
@@ -421,22 +461,22 @@ public final class LoginFrame extends JFrame {
             return;
         }
 
-        String login = loginField.getText().trim();
+        String login = loginField.getText().strip();
         String password = new String(passwordField.getPassword());
         boolean valid = true;
         if (login.isBlank()) {
             showFieldError(loginField, loginError, "Vui lòng nhập email hoặc tên đăng nhập.");
             valid = false;
         }
-        if (password.length() < 6) {
-            showFieldError(passwordField, passwordError, "Mật khẩu cần có ít nhất 6 ký tự.");
+        if (password.isEmpty()) {
+            showFieldError(passwordField, passwordError, "Vui lòng nhập mật khẩu.");
             valid = false;
         }
         if (!valid) return;
 
+        loginPending = true;
         submitButton.setEnabled(false);
-        submitButton.setText(signUpMode ? "Đang tạo tài khoản..." : "Đang đăng nhập...");
-        setStatus("Đang kết nối an toàn...", false);
+        submitButton.setText("Đang đăng nhập…");
         if (loginHandler == null) {
             dispose();
             onAuthenticated.run();
@@ -449,11 +489,15 @@ public final class LoginFrame extends JFrame {
                 throw new CompletionException(error);
             }
         }).whenComplete((ignored, error) -> javax.swing.SwingUtilities.invokeLater(() -> {
+            if (!isDisplayable()) return;
+            loginPending = false;
             if (error != null) {
                 submitButton.setEnabled(true);
                 submitButton.setText("Đăng nhập");
-                Throwable cause = error.getCause() == null ? error : error.getCause();
-                setStatus("Đăng nhập thất bại: " + cause.getMessage(), true);
+                Throwable cause = rootCause(error);
+                setStatus(cause instanceof ApiException apiError && apiError.statusCode() == 401
+                        ? "Email, tên đăng nhập hoặc mật khẩu không đúng."
+                        : "Chưa thể đăng nhập. Vui lòng thử lại.", true);
                 return;
             }
             passwordField.setText("");
@@ -469,84 +513,253 @@ public final class LoginFrame extends JFrame {
             return;
         }
 
-        submitButton.setEnabled(false);
-        submitButton.setText("Đang gửi email...");
-        setStatus("Đang kiểm tra tài khoản...", false);
-        forgotPasswordTimer = new Timer(650, event -> {
-            cancelForgotPasswordRequest();
-            if (!forgotPasswordMode) return;
-            submitButton.setEnabled(true);
-            submitButton.setText("Gửi lại email");
-            setStatus("Nếu email đã đăng ký, liên kết đặt lại sẽ được gửi đến hộp thư của bạn.", false);
-        });
-        forgotPasswordTimer.setRepeats(false);
-        forgotPasswordTimer.start();
+        if (passwordResetHandler == null) {
+            setStatus("Hãy chạy chế độ live để đặt lại mật khẩu.", true);
+            return;
+        }
+        requestPasswordReset(email, null);
     }
 
-    private void cancelForgotPasswordRequest() {
-        if (forgotPasswordTimer != null) {
-            forgotPasswordTimer.stop();
-            forgotPasswordTimer = null;
-        }
+    private void requestPasswordReset(String email, String otp) {
+        loginPending = true;
+        submitButton.setEnabled(false);
+        submitButton.setText("Đang gửi email…");
+        CompletableFuture.runAsync(() -> {
+            try {
+                passwordResetHandler.request(email, otp);
+            } catch (Exception error) {
+                throw new CompletionException(error);
+            }
+        }).whenComplete((ignored, error) -> javax.swing.SwingUtilities.invokeLater(() -> {
+            if (!isDisplayable()) return;
+            loginPending = false;
+            submitButton.setEnabled(true);
+            submitButton.setText("Gửi mã xác minh");
+            if (error != null) {
+                Throwable cause = rootCause(error);
+                if (cause instanceof ApiException api && api.statusCode() == 422) {
+                    promptPasswordReset(email, "Mã OTP không đúng. ");
+                } else {
+                    setStatus(cause instanceof ApiException api && (api.statusCode() == 410 || api.statusCode() == 429)
+                            ? api.getMessage() : "Chưa thể đặt lại mật khẩu. Vui lòng thử lại.", true);
+                }
+            } else if (otp == null) {
+                promptPasswordReset(email, "");
+            } else {
+                setMode(false);
+                loginField.setText(email);
+                setStatus("Nếu email đã đăng ký, mật khẩu mới đã được gửi.", false);
+            }
+        }));
+    }
+
+    private void promptPasswordReset(String email, String message) {
+        String otp = showOtpDialog("Đặt lại mật khẩu", email, message);
+        if (otp != null) requestPasswordReset(email, otp);
     }
 
     private void submitRegistration() {
-        String fullName = fullNameField.getText().trim();
-        String email = registrationEmailField.getText().trim();
+        String fullName = fullNameField.getText();
+        String email = registrationEmailField.getText();
         String password = new String(registrationPasswordField.getPassword());
         String confirmation = new String(confirmPasswordField.getPassword());
-        boolean valid = true;
-
-        if (fullName.length() < 2) {
-            showFieldError(fullNameField, fullNameError, "Vui lòng nhập họ tên.");
-            valid = false;
+        RegistrationValidator.Errors errors = RegistrationValidator.validate(
+                fullName, email, password, confirmation);
+        if (errors.fullNameError() != null) showFieldError(fullNameField, fullNameError, errors.fullNameError());
+        if (errors.emailError() != null) showFieldError(registrationEmailField, registrationEmailError, errors.emailError());
+        registrationPasswordError.setForeground(ERROR);
+        if (errors.passwordError() != null) {
+            showFieldError(registrationPasswordField, registrationPasswordError, errors.passwordError());
+        } else {
+            updateRegistrationPasswordHint();
         }
-        if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
-            showFieldError(registrationEmailField, registrationEmailError, "Email chưa hợp lệ.");
-            valid = false;
-        }
-        if (password.length() < 8) {
-            showFieldError(registrationPasswordField, registrationPasswordError, "Tối thiểu 8 ký tự.");
-            valid = false;
-        }
-        if (!confirmation.equals(password)) {
-            showFieldError(confirmPasswordField, confirmPasswordError, "Mật khẩu chưa khớp.");
-            valid = false;
-        }
-        if (!termsCheckBox.isSelected()) {
-            termsError.setText("Bạn cần đồng ý với điều khoản để tiếp tục.");
-            valid = false;
-        }
-        if (!valid) return;
+        if (errors.confirmationError() != null) showFieldError(confirmPasswordField, confirmPasswordError, errors.confirmationError());
+        if (!errors.valid()) return;
+        fullName = errors.fullName();
+        email = errors.email();
 
         if (registrationHandler == null) {
             setStatus("Chế độ demo không lưu tài khoản. Hãy chạy server và client live.", true);
             return;
         }
 
+        registrationPending = true;
         submitButton.setEnabled(false);
-        submitButton.setText("Đang tạo tài khoản...");
-        setStatus("Đang lưu tài khoản vào database...", false);
+        submitButton.setText("Đang gửi mã OTP…");
+        String submittedName = fullName;
+        String submittedEmail = email;
+        CompletableFuture.runAsync(() -> {
+            try {
+                otpSender.send(submittedEmail);
+            } catch (Exception error) {
+                throw new CompletionException(error);
+            }
+        }).whenComplete((ignored, error) -> javax.swing.SwingUtilities.invokeLater(() -> {
+            if (!isDisplayable()) return;
+            if (error != null) {
+                finishRegistrationAttempt();
+                Throwable cause = rootCause(error);
+                setStatus(cause instanceof ApiException api && api.statusCode() == 429
+                        ? api.getMessage() : "Chưa thể gửi mã OTP. Vui lòng thử lại.", true);
+                return;
+            }
+            promptForOtp(submittedName, submittedEmail, password, "");
+        }));
+    }
+
+    private void promptForOtp(String name, String email, String password, String errorMessage) {
+        String otp = showOtpDialog("Xác minh email", email, errorMessage);
+        if (otp == null) finishRegistrationAttempt();
+        else verifyRegistration(name, email, password, otp);
+    }
+
+    public static void previewOtp() {
+        LoginFrame owner = new LoginFrame(() -> { }, null, null, null, null);
+        try {
+            owner.showOtpDialog("Xác minh email", "demo@example.com", "");
+        } finally {
+            owner.dispose();
+        }
+    }
+
+    private String showOtpDialog(String title, String email, String errorMessage) {
+        JDialog dialog = new JDialog(this, title, true);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        JPanel body = new JPanel(new BorderLayout(0, 16));
+        body.setBackground(SURFACE);
+        body.setBorder(new EmptyBorder(24, 28, 22, 28));
+        dialog.setContentPane(body);
+
+        JPanel copy = verticalCard();
+        JLabel heading = new JLabel(title);
+        heading.setForeground(INK);
+        heading.setFont(BODY.deriveFont(Font.BOLD, 24f));
+        copy.add(heading);
+        copy.add(Box.createVerticalStrut(8));
+        JTextArea instructions = new JTextArea("Nhập mã 6 số đã gửi đến " + email + ". Mã có hiệu lực trong 5 phút.");
+        instructions.setFont(BODY);
+        instructions.setForeground(MUTED);
+        instructions.setOpaque(false);
+        instructions.setEditable(false);
+        instructions.setLineWrap(true);
+        instructions.setWrapStyleWord(true);
+        instructions.setColumns(29);
+        instructions.setAlignmentX(LEFT_ALIGNMENT);
+        copy.add(instructions);
+        body.add(copy, BorderLayout.NORTH);
+
+        JPanel input = verticalCard();
+        JLabel label = fieldLabel("Mã OTP");
+        JTextField code = new RoundedTextField("");
+        label.setLabelFor(code);
+        configureField(code, "Mã OTP gồm 6 chữ số");
+        code.setHorizontalAlignment(JTextField.CENTER);
+        code.setFont(new Font(Font.MONOSPACED, Font.BOLD, 26));
+        input.add(label);
+        input.add(Box.createVerticalStrut(6));
+        input.add(code);
+        JLabel feedback = errorLabel();
+        feedback.setText(errorMessage.isBlank() ? " " : errorMessage.strip());
+        input.add(feedback);
+        body.add(input, BorderLayout.CENTER);
+
+        RoundedButton confirm = new RoundedButton("Xác minh", true);
+        confirm.setEnabled(false);
+        JButton cancel = linkButton("Hủy");
+        JPanel actions = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 12, 0));
+        actions.setOpaque(false);
+        confirm.setPreferredSize(new Dimension(136, 44));
+        actions.add(cancel);
+        actions.add(confirm);
+        body.add(actions, BorderLayout.SOUTH);
+
+        String[] result = new String[1];
+        code.getDocument().addDocumentListener(onTextChange(() -> {
+            String value = code.getText().strip();
+            boolean invalid = !value.matches("[0-9]{0,6}");
+            confirm.setEnabled(!invalid && value.length() == 6);
+            feedback.setText(invalid ? "Vui lòng nhập đúng 6 chữ số." : " ");
+            setInvalid(code, invalid);
+        }));
+        confirm.addActionListener(event -> {
+            result[0] = code.getText().strip();
+            dialog.dispose();
+        });
+        cancel.addActionListener(event -> dialog.dispose());
+        dialog.getRootPane().setDefaultButton(confirm);
+        dialog.getRootPane().registerKeyboardAction(event -> dialog.dispose(),
+                KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), JComponent.WHEN_IN_FOCUSED_WINDOW);
+        dialog.pack();
+        dialog.setResizable(false);
+        dialog.setLocationRelativeTo(this);
+        javax.swing.SwingUtilities.invokeLater(code::requestFocusInWindow);
+        dialog.setVisible(true);
+        return result[0];
+    }
+
+    private static javax.swing.event.DocumentListener onTextChange(Runnable update) {
+        return new javax.swing.event.DocumentListener() {
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent event) { update.run(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent event) { update.run(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent event) { update.run(); }
+        };
+    }
+
+    private void updateRegistrationPasswordHint() {
+        String password = new String(registrationPasswordField.getPassword());
+        String error = com.javachat.shared.model.RegistrationPassword.error(password);
+        registrationPasswordError.setForeground(password.isEmpty() ? MUTED
+                : error == null ? new Color(36, 118, 67) : ERROR);
+        registrationPasswordError.setText(password.isEmpty() ? "8–72 ký tự, có chữ in hoa."
+                : error == null ? "Mật khẩu đạt yêu cầu." : error);
+        setInvalid(registrationPasswordField, !password.isEmpty() && error != null);
+    }
+
+    private void finishRegistrationAttempt() {
+        registrationPending = false;
+        submitButton.setEnabled(true);
+        submitButton.setText("Đăng ký");
+    }
+
+    private void verifyRegistration(String name, String email, String password, String otp) {
+        submitButton.setText("Đang đăng ký…");
         CompletableFuture.supplyAsync(() -> {
             try {
-                return registrationHandler.register(fullName, email, password);
+                return registrationHandler.register(name, email, password, otp);
             } catch (Exception error) {
                 throw new CompletionException(error);
             }
         }).whenComplete((userId, error) -> javax.swing.SwingUtilities.invokeLater(() -> {
+            if (!isDisplayable()) return;
+            finishRegistrationAttempt();
             if (error != null) {
-                submitButton.setEnabled(true);
-                submitButton.setText("Tạo tài khoản");
-                Throwable cause = error.getCause() == null ? error : error.getCause();
-                setStatus("Không tạo được tài khoản: " + cause.getMessage(), true);
+                Throwable cause = rootCause(error);
+                if (cause instanceof ApiException apiError && apiError.statusCode() == 422) {
+                    registrationPending = true;
+                    submitButton.setEnabled(false);
+                    promptForOtp(name, email, password, apiError.getMessage() + "\n");
+                } else if (cause instanceof ApiException apiError && apiError.statusCode() == 410) {
+                    setStatus("Mã OTP không còn hiệu lực. Bấm Đăng ký để gửi mã mới.", true);
+                } else if (cause instanceof ApiException apiError && apiError.statusCode() == 409) {
+                    showFieldError(registrationEmailField, registrationEmailError,
+                            "Email này đã được đăng ký.");
+                } else {
+                    setStatus("Chưa thể hoàn tất đăng ký. Vui lòng thử lại.", true);
+                }
                 return;
             }
             registrationPasswordField.setText("");
             confirmPasswordField.setText("");
             loginField.setText(email);
             setMode(false);
-            setStatus("Đã lưu tài khoản (ID " + userId + "). Hãy đăng nhập.", false);
+            setStatus("Đăng ký thành công. Vui lòng đăng nhập để tiếp tục.", false);
         }));
+    }
+
+    private static Throwable rootCause(Throwable error) {
+        Throwable result = error;
+        while (result.getCause() != null) result = result.getCause();
+        return result;
     }
 
     private void clearErrors() {
@@ -556,7 +769,6 @@ public final class LoginFrame extends JFrame {
         registrationEmailError.setText(" ");
         registrationPasswordError.setText(" ");
         confirmPasswordError.setText(" ");
-        termsError.setText(" ");
         forgotEmailError.setText(" ");
         formStatus.setText(" ");
         setInvalid(loginField, false);

@@ -17,6 +17,16 @@ import com.javachat.shared.dto.AuthDtos.PresenceChangedEvent;
 
 /** HTTP client for the loopback Java server. Database credentials never enter requests. */
 public final class LiveApiClient {
+    public static final class ApiException extends IOException {
+        private final int statusCode;
+
+        public ApiException(int statusCode, String message) {
+            super(message);
+            this.statusCode = statusCode;
+        }
+
+        public int statusCode() { return statusCode; }
+    }
     private final HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5)).build();
     private final URI base;
@@ -86,7 +96,8 @@ public final class LiveApiClient {
                     HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             Map<String, Object> value = Json.object(Json.parse(response.body()));
             if (response.statusCode() < 200 || response.statusCode() >= 300)
-                throw new IOException(String.valueOf(value.getOrDefault("error", "HTTP " + response.statusCode())));
+                throw new ApiException(response.statusCode(),
+                        String.valueOf(value.getOrDefault("error", "HTTP " + response.statusCode())));
             return value;
         } catch (InterruptedException error) {
             Thread.currentThread().interrupt();

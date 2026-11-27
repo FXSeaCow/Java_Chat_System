@@ -47,7 +47,10 @@ public final class ServerApp {
         DatabaseConfig databaseConfig = DatabaseConfig.load();
         AccountRepository accounts = new AccountRepository(databaseConfig);
         HttpServer server = HttpServer.create(new InetSocketAddress(address, port), 0);
-        server.createContext("/api/", exchange -> handle(exchange, databaseConfig, accounts));
+        var mail = new SmtpMailSender(settings);
+        var registrationOtp = new RegistrationOtp(mail);
+        var resetOtp = new RegistrationOtp(mail);
+        server.createContext("/api/", exchange -> handle(exchange, databaseConfig, accounts, registrationOtp, resetOtp));
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         int tcpPort = Integer.parseInt(System.getenv().getOrDefault(
                 "JAVA_CHAT_TCP_PORT", settings.getProperty("server.tcp.port", "9090")).trim());
@@ -105,7 +108,8 @@ public final class ServerApp {
     }
 
     private static void handle(HttpExchange exchange, DatabaseConfig databaseConfig,
-                               AccountRepository accounts) throws IOException {
+                               AccountRepository accounts, RegistrationOtp registrationOtp,
+                               RegistrationOtp resetOtp) throws IOException {
         try {
             String path = exchange.getRequestURI().getPath();
             String method = exchange.getRequestMethod();
@@ -141,9 +145,53 @@ public final class ServerApp {
                 return;
             }
             Map<String, Object> body = Json.object(Json.parse(new String(bytes, StandardCharsets.UTF_8)));
+            if ("/api/app-launch".equals(path)) {
+                accounts.recordAppLaunch(java.util.UUID.fromString(string(body, "launchId")), openedAt(body));
+                respond(exchange, 200, Map.of("ok", true));
+                return;
+            }
+            if ("/api/auth/register/send-otp".equals(path)) {
+                try {
+                    registrationOtp.send(string(body, "email"), "Mã xác minh đăng ký E-Chat");
+                } catch (IOException error) {
+                    System.err.println("Registration email: " + error.getMessage());
+                    respond(exchange, 503, Map.of("error", "Chưa thể gửi mã OTP. Vui lòng thử lại."));
+                    return;
+                }
+                respond(exchange, 200, Map.of("ok", true));
+                return;
+            }
+            if ("/api/auth/reset-password/send-otp".equals(path) || "/api/auth/reset-password".equals(path)) {
+                String email = string(body, "email");
+                try {
+                    if (path.endsWith("/send-otp")) {
+                        resetOtp.send(email, "Mã xác minh đặt lại mật khẩu E-Chat");
+                    } else {
+                        resetOtp.verify(email, string(body, "otp"));
+                        accounts.resetPassword(email, password -> resetOtp.sendEmail(email,
+                                "Mật khẩu mới của bạn trên E-Chat",
+                                "Mật khẩu tạm thời: " + password + "\nMã có hiệu lực trong 30 phút. "
+                                        + "Hãy đăng nhập bằng mật khẩu này, sau đó đổi lại mật khẩu."));
+                    }
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    respond(exchange, 503, Map.of("error", "Chưa thể gửi email. Vui lòng thử lại."));
+                    return;
+                } catch (IOException error) {
+                    System.err.println("Password reset email: " + error.getMessage());
+                    respond(exchange, 503, Map.of("error", "Chưa thể gửi email. Vui lòng thử lại."));
+                    return;
+                }
+                respond(exchange, 200, Map.of("ok", true));
+                return;
+            }
             if ("/api/auth/register".equals(path)) {
+                String email = string(body, "email");
+                String name = string(body, "displayName");
+                String password = string(body, "password");
+                registrationOtp.verify(email, string(body, "otp"));
                 respond(exchange, 201, Map.of("userId", accounts.register(
-                        string(body, "displayName"), string(body, "email"), string(body, "password"))));
+                        name, email, password)));
                 return;
             }
             if ("/api/auth/login".equals(path)) {
@@ -210,6 +258,11 @@ public final class ServerApp {
                 respond(exchange, 200, Map.of("ok", true));
                 return;
             }
+            if ("/api/auth/app-open".equals(path)) {
+                accounts.recordAppOpen(userId, java.util.UUID.fromString(string(body, "launchId")), openedAt(body));
+                respond(exchange, 200, Map.of("ok", true));
+                return;
+            }
             if ("/api/auth/change-password".equals(path)) {
                 accounts.changePassword(userId, string(body, "currentPassword"),
                         string(body, "newPassword"));
@@ -218,6 +271,12 @@ public final class ServerApp {
             }
             ChatRepository repository = new ChatRepository(databaseConfig, userId);
             switch (path) {
+                case "/api/profile/update" -> {
+                    repository.updateProfile(string(body, "displayName"), optionalText(body, "avatarUrl"),
+                            optionalText(body, "address"), optionalText(body, "dateOfBirth"),
+                            optionalText(body, "gender"));
+                    respond(exchange, 200, Map.of("ok", true));
+                }
                 case "/api/messages" -> respond(exchange, 200, Map.of("id",
                         repository.sendMessage(number(body, "conversationId"),
                                 optionalNumber(body, "replyToId"), string(body, "content"))));
@@ -250,6 +309,8 @@ public final class ServerApp {
                 }
                 default -> respond(exchange, 404, Map.of("error", "Unknown API endpoint"));
             }
+        } catch (RegistrationOtp.Rejected error) {
+            respond(exchange, error.status, Map.of("error", error.getMessage()));
         } catch (AccountRepository.AuthenticationException error) {
             respond(exchange, 401, Map.of("error", error.getMessage()));
         } catch (IllegalArgumentException error) {
@@ -298,6 +359,18 @@ public final class ServerApp {
     private static Long optionalNumber(Map<String, Object> body, String key) {
         Object value = body.get(key);
         return value == null ? null : number(body, key);
+    }
+
+    private static java.time.Instant openedAt(Map<String, Object> body) {
+        try {
+            return java.time.Instant.parse(string(body, "openedAt"));
+        } catch (java.time.format.DateTimeParseException error) {
+            throw new IllegalArgumentException("Invalid application launch timestamp.");
+        }
+    }
+
+    private static String optionalText(Map<String, Object> body, String key) {
+        return body.get(key) == null ? null : string(body, key);
     }
 
     private static String string(Map<String, Object> body, String key) {

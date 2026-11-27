@@ -90,8 +90,17 @@ separate PowerShell terminals from the repository root:
 .\run-client.ps1
 ```
 
-`run-server.ps1` expects pgJDBC 42.7.14 in the local Maven cache. Run
-`mvn -pl server -am install -DskipTests` once if the JAR is missing.
+`run-server.ps1` uses Maven to build the server and download runtime dependencies.
+For registration OTP and password reset, add your Gmail sender and its Google
+App Password to the local `config.properties`:
+
+```properties
+email.smtp.username=your-sender@gmail.com
+email.smtp.app_password=YOUR_GOOGLE_APP_PASSWORD
+```
+
+Enable Google 2-Step Verification before creating the App Password. The server
+sends via `smtp.gmail.com:587` with required STARTTLS.
 The client connects to `http://127.0.0.1:8080` by default. If you change
 `server.port`, set `JAVA_CHAT_API_URL` to the matching loopback URL before
 starting the client. The server reads and writes conversations, messages,
@@ -124,17 +133,24 @@ passes that event to `MainFrame.applyPresence(...)` on the Swing event thread;
 the periodic `/api/presence` refresh also recovers missed events.
 AI suggestions are still unavailable in live mode.
 
-In live mode, the registration form calls `POST /api/auth/register` on the local
-server and inserts a row into `public.users`. Passwords are stored as PBKDF2
-hashes. Registration requires the server and database to be reachable; demo
+In live mode, the registration form verifies an email OTP before creating a
+row in `public.users`. New password hashes use BCrypt where supported, with
+PBKDF2 for passwords that BCrypt cannot safely represent.
+Registration requires the server and database to be reachable; demo
 mode does not save accounts. Log in with the registered email and password.
 Use **Tài khoản > Đăng xuất** to return to the sign-in screen. In live mode,
 logout marks the current row in `public.auth_sessions` as logged out and clears
 the desktop token. In demo mode, it returns to the demo sign-in screen.
 Use **Tài khoản > Đổi mật khẩu** to enter the current and new password. The live
-server verifies the current password, stores a new PBKDF2 hash, ends all active
+server verifies the current password, stores a new password hash, ends all active
 sessions for the account, and asks the user to sign in again. Demo mode does
 not change passwords.
+
+For an existing database, apply the SQL files in `database/migrations/` before
+starting the updated server. A password-reset email contains a temporary
+password valid for 30 minutes. The existing password remains valid until the
+user first signs in with the temporary password, which replaces it and ends
+the earlier sessions.
 Existing seed accounts use bcrypt hashes through the Supabase `pgcrypto`
 extension. The current seed hash does not match the password stated in
 `database/seed.sql`, so use a newly registered account for live sign-in.
