@@ -25,6 +25,44 @@ public final class ChatRepository {
         this.currentUserId = currentUserId;
     }
 
+    public void updateProfile(String displayName, String avatarUrl, String address,
+                              String dateOfBirth, String gender) throws SQLException {
+        String name = displayName.strip();
+        if (name.isEmpty() || name.length() > 100)
+            throw new IllegalArgumentException("Họ và tên phải có từ 1 đến 100 ký tự.");
+        if (address != null && address.length() > 255)
+            throw new IllegalArgumentException("Địa chỉ không được vượt quá 255 ký tự.");
+        if (avatarUrl != null && (avatarUrl.length() > 2048
+                || !avatarUrl.matches("(?i)https?://[^\\s]+")))
+            throw new IllegalArgumentException("Đường dẫn ảnh đại diện phải là URL HTTP hoặc HTTPS hợp lệ.");
+        if (gender != null && !Set.of("MALE", "FEMALE", "OTHER").contains(gender))
+            throw new IllegalArgumentException("Giới tính không hợp lệ.");
+        LocalDate birth = null;
+        if (dateOfBirth != null) {
+            try {
+                birth = LocalDate.parse(dateOfBirth);
+            } catch (java.time.format.DateTimeParseException error) {
+                throw new IllegalArgumentException("Ngày sinh không hợp lệ.");
+            }
+            if (birth.isAfter(LocalDate.now()) || birth.getYear() < 1)
+                throw new IllegalArgumentException("Ngày sinh không hợp lệ.");
+        }
+        try (Connection connection = config.openConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     UPDATE public.users SET display_name = ?, avatar_url = ?, address = ?,
+                         date_of_birth = ?, gender = ?
+                     WHERE id = ? AND status = 'ACTIVE'
+                     """)) {
+            statement.setString(1, name);
+            statement.setString(2, avatarUrl);
+            statement.setString(3, address);
+            statement.setObject(4, birth);
+            statement.setString(5, gender);
+            statement.setLong(6, currentUserId);
+            if (statement.executeUpdate() != 1) throw new IllegalArgumentException("Tài khoản không khả dụng.");
+        }
+    }
+
     public Map<String, Object> snapshot() throws SQLException {
         try (Connection connection = config.openConnection()) {
             connection.setReadOnly(true);

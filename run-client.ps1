@@ -1,3 +1,5 @@
+param([switch]$PreviewOtp)
+
 $ErrorActionPreference = 'Stop'
 $classDir = Join-Path $PSScriptRoot 'out\user-client-live'
 $resourcesDir = Join-Path $PSScriptRoot 'user-client\src\main\resources'
@@ -9,5 +11,7 @@ $sources = @(
 New-Item -ItemType Directory -Force -Path $classDir | Out-Null
 & javac -encoding UTF-8 -d $classDir $sources
 if ($LASTEXITCODE -ne 0) { throw 'Client compilation failed.' }
-& java -cp "$classDir;$resourcesDir" com.javachat.user.UserClientApp
+$clientArguments = @()
+if ($PreviewOtp) { $clientArguments += '--preview-otp' }
+& java -cp "$classDir;$resourcesDir" com.javachat.user.UserClientApp @clientArguments
 if ($LASTEXITCODE -ne 0) { throw 'Client exited with an error.' }

@@ -24,11 +24,28 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class UserClientApp {
+    private static final String LAUNCH_ID = java.util.UUID.randomUUID().toString();
+    private static final String OPENED_AT = Instant.now().toString();
     private UserClientApp() { }
 
     public static void main(String[] args) {
+        if (List.of(args).contains("--preview-otp")) {
+            SwingUtilities.invokeLater(LoginFrame::previewOtp);
+            return;
+        }
         boolean demo = List.of(args).contains("--demo");
+        if (!demo) CompletableFuture.runAsync(() -> {
+            try {
+                new LiveApiClient().post("/api/app-launch", launchData());
+            } catch (java.io.IOException error) {
+                System.err.println("Không ghi được lần mở ứng dụng.");
+            }
+        });
         SwingUtilities.invokeLater(() -> showLogin(demo));
+    }
+
+    private static Map<String, Object> launchData() {
+        return Map.of("launchId", LAUNCH_ID, "openedAt", OPENED_AT);
     }
 
     private static void showLogin(boolean demo) {
@@ -48,10 +65,26 @@ public final class UserClientApp {
             LiveApiClient api = new LiveApiClient();
             api.login(loginName, password);
             authenticatedApi.set(api);
-        }, demo ? null : (displayName, email, password) -> {
+            CompletableFuture.runAsync(() -> {
+                try {
+                    api.post("/api/auth/app-open", launchData());
+                } catch (java.io.IOException error) {
+                    System.err.println("Không ghi được lần mở ứng dụng.");
+                }
+            });
+        }, demo ? null : email -> {
+            new LiveApiClient().post("/api/auth/register/send-otp", Map.of("email", email));
+        }, demo ? null : (displayName, email, password, otp) -> {
             var result = new LiveApiClient().post("/api/auth/register", Map.of(
-                    "displayName", displayName, "email", email, "password", password));
+                    "displayName", displayName, "email", email, "password", password, "otp", otp));
             return ((Number) result.get("userId")).longValue();
+        }, demo ? null : (email, otp) -> {
+            var api = new LiveApiClient();
+            if (otp == null) {
+                api.post("/api/auth/reset-password/send-otp", Map.of("email", email));
+            } else {
+                api.post("/api/auth/reset-password", Map.of("email", email, "otp", otp));
+            }
         });
         login.setVisible(true);
     }
@@ -218,7 +251,27 @@ public final class UserClientApp {
                 frame.setProfileUpdateSucceeded(current.get().updateProfile(request));
                 refresh(frame, current.get());
             } else {
-                frame.setProfileUpdateFailed("Server chưa hỗ trợ cập nhật thông tin tài khoản.");
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        Map<String, Object> body = new LinkedHashMap<>();
+                        body.put("displayName", request.displayName());
+                        body.put("avatarUrl", request.avatarUrl());
+                        body.put("address", request.address());
+                        body.put("dateOfBirth", request.dateOfBirth() == null ? null : request.dateOfBirth().toString());
+                        body.put("gender", request.gender() == null ? null : request.gender().name());
+                        api.post("/api/profile/update", body);
+                    } catch (java.io.IOException error) {
+                        throw new CompletionException(error);
+                    }
+                }).whenComplete((ignored, error) -> SwingUtilities.invokeLater(() -> {
+                    if (!frame.isDisplayable()) return;
+                    if (error != null) {
+                        frame.setProfileUpdateFailed("Chưa thể lưu hồ sơ. Vui lòng thử lại.");
+                        return;
+                    }
+                    frame.setProfileUpdateSucceeded(current.get().updateProfile(request));
+                    refresh(frame, current.get());
+                }));
             }
         });
         if (api == null) {
